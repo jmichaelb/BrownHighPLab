@@ -3,28 +3,16 @@
 % functions, and then adds data to a structure
 
 peaks = [1 2 3 4 ];
+fnameSpec = 'x%03d';
 
 spectraNum = input('Spectra number? ');
-filename = spectraNum;
 
-if isempty(filename)
+if isnan(filename)
     error('Enter an integer');
 end
 
-filename = num2str(filename);
+filename = sprintf(fnameSpec,spectraNum);
 
-
-     if length(filename) == 1
-         filename = strcat('x00',filename);
-     elseif length(filename) == 2
-         filename = strcat('x0',filename);
-     elseif length(filename) == 3
-         filename = strcat('x', filename);
-     else
-         error('Enter an integer')
-     end
-
- 
 option = input('Manual or automatic peak selection, or view existing plot? (m/a/p) ', 's');
 
 % If the spectra already has a full filename, use the existing filename. If using existing filename, nameswitch = 1 

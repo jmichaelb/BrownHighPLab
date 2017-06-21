@@ -3,30 +3,26 @@
 % functions, and then adds data to a structure
 
 peaks = [1 2 3 4 ];
-fnameSpec = 'x%03d';
+fnameSepChar = '_';
+fnameSpec = strcat('x%03d',fnameSepChar,'*.mat');
 
 spectraNum = input('Spectra number? ');
 
-if isnan(filename)
+if isnan(spectraNum)
     error('Enter an integer');
 end
-
 filename = sprintf(fnameSpec,spectraNum);
 
+% If the spectra already has a full filename, use the existing filename. 
+% If using existing filename, nameswitch = 1 
+x = dir(filename);
+if ~isempty(x)
+    filename = x(1).name;
+    nameswitch = 1;
+end
+
 option = input('Manual or automatic peak selection, or view existing plot? (m/a/p) ', 's');
-
-% If the spectra already has a full filename, use the existing filename. If using existing filename, nameswitch = 1 
-x = dir;
- 
-     for i = 1:length({x.name})
-         if length(x(i).name) > 8 && isequal(x(i).name(1:4), filename(1:4))
-             filename = x(i).name;
-             nameswitch = 1;
-         end
-     end
     
-     
-
 switch option
 
      case 'p'

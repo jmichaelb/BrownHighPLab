@@ -28,7 +28,7 @@
         if ~ exist('check') 
 
             data = struct('Filename', filename, 'SpectraTime', spectratime, 'Omega1', interpO1, 'Omega2', interpO2, 'Heise1', Heise1, 'Heise2', Heise2,...
-                              'Ch2', interpCh2, 'SoundSpeed', UltraSonicStrc.vel, 'Omega1STD', O1STD, 'Omega2STD', O2STD, 'Ch2STD', Ch2STD, 'delVel', UltraSonicStrc.del_vel);
+                              'Ch2', interpCh2, 'SoundSpeed', UltraSonicStrc.vel, 'Omega1STD', O1STD, 'Omega2STD', O2STD, 'Ch2STD', Ch2STD, 'delVel', UltraSonicStrc.del_vel, 'roomT', interpRoomT, 'roomTSTD', RoomTSTD);
             
             save(filesave,'data')
         else
@@ -52,6 +52,8 @@
             data(spectraNum).Omega2STD = O2STD;
             data(spectraNum).Ch2STD = Ch2STD;
             data(spectraNum).delVel = UltraSonicStrc.del_vel;
+            data(spectraNum).roomT = interpRoomT;
+            data(spectraNum).roomTSTD = RoomTSTD;
             
             save(filesave, 'data')
 

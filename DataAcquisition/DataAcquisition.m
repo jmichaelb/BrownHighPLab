@@ -3,26 +3,42 @@
 % functions, and then adds data to a structure
 
 peaks = [1 2 3 4 ];
-fnameSepChar = '_';
-fnameSpec = strcat('x%03d',fnameSepChar,'*.mat');
 
 spectraNum = input('Spectra number? ');
+filename = spectraNum;
 
-if isnan(spectraNum)
+if isempty(filename)
     error('Enter an integer');
 end
-filename = sprintf(fnameSpec,spectraNum);
 
-% If the spectra already has a full filename, use the existing filename. 
-% If using existing filename, nameswitch = 1 
-x = dir(filename);
-if ~isempty(x)
-    filename = x(1).name;
-    nameswitch = 1;
-end
+filename = num2str(filename);
 
+
+     if length(filename) == 1
+         filename = strcat('x00',filename);
+     elseif length(filename) == 2
+         filename = strcat('x0',filename);
+     elseif length(filename) == 3
+         filename = strcat('x', filename);
+     else
+         error('Enter an integer')
+     end
+
+ 
 option = input('Manual or automatic peak selection, or view existing plot? (m/a/p) ', 's');
+
+% If the spectra already has a full filename, use the existing filename. If using existing filename, nameswitch = 1 
+x = dir;
+ 
+     for i = 1:length({x.name})
+         if length(x(i).name) > 8 && isequal(x(i).name(1:4), filename(1:4))
+             filename = x(i).name;
+             nameswitch = 1;
+         end
+     end
     
+     
+
 switch option
 
      case 'p'
@@ -40,7 +56,7 @@ switch option
         % Adding new sound speed and misfit to existing structure
         data(spectraNum).SoundSpeed = UltraSonicStrc.vel;
         data(spectraNum).delVel = UltraSonicStrc.del_vel;
-        %save(filesave,'data')
+        save(filesave,'data')
 
 otherwise
          
@@ -72,6 +88,7 @@ workingDir = '/Users/common/Documents/Experiment /DataAcquisition';
 Omega1filename = strcat(filedate, '_100KPSI_OLD.txt');
 Ch2filename = strcat(filedate, '_CH1_CH2.txt');
 Omega2filename = strcat(filedate, '_100KPSI_NEW.txt');
+RoomTfilename = strcat(filedate, '_CH3.txt');
 
     % If Omega 2 is not set up but the user forgets to turn off data
     % logging, still consider Omega2filename to not exist
@@ -87,7 +104,7 @@ Omega2filename = strcat(filedate, '_100KPSI_NEW.txt');
 % Copy raw spectra files, paste to DataAcquisition folder 
 copyfile(Omega1filename, strcat(workingDir,'/Omega1.txt'))
 copyfile(Ch2filename, strcat(workingDir, '/Ch2.txt'))
-
+copyfile(RoomTfilename, strcat(workingDir, '/RoomT.txt'))
     if exist(Omega2filename)
         copyfile(Omega2filename, strcat(workingDir, '/Omega2.txt'))
     end
@@ -95,6 +112,7 @@ copyfile(Ch2filename, strcat(workingDir, '/Ch2.txt'))
 % Redefining file names with new copied files 
 Omega1filename = strcat(workingDir,'/Omega1.txt');
 Ch2filename = strcat(workingDir, '/Ch2.txt');
+RoomTfilename = strcat(workingDir, '/RoomT.txt');
 
     if exist(Omega2filename)
         Omega2filename = strcat(workingDir, '/Omega2.txt');
@@ -105,6 +123,7 @@ Ch2filename = strcat(workingDir, '/Ch2.txt');
 % Importing data from .txt log files
 Omega1 = importdata(Omega1filename);
 Ch2 = importdata(Ch2filename);
+RoomT = importdata(RoomTfilename,'\t');
 
     if exist(Omega2filename)
         Omega2 = importdata(Omega2filename);
@@ -113,13 +132,14 @@ Ch2 = importdata(Ch2filename);
 % Getting rid of unnecessary data from the logs. (Uncorrected data, Ch1 etc.) 
 Omega1 = {Omega1.textdata, Omega1.data(:,7), Omega1.data(:,2)};
 Ch2 = {Ch2.textdata, Ch2.data(:,3)};
+RoomT = {RoomT.textdata, RoomT.data(:,1)};
 
     if exist(Omega2filename)
         Omega2 = {Omega2.textdata, Omega2.data(:,7), Omega2.data(:,2)};
     end
 
 % Getting rid of sub-seconds in log file times for logical operations further down in the script
-    
+
 x = Omega1{1};
 
     for i = 1:length(x)
@@ -158,14 +178,25 @@ x = Ch2{1};
     end
 Ch2{1} = datenum(x);
 
+x = RoomT{1};
+    for i = 1:length(x)
+        if x{i}(5) == ':'
+        x{i} = strcat(x{i}(1:7), x{i}(12:end));
+        else
+        x{i} = strcat(x{i}(1:8), x{i}(13:end));
+        end
+    end
+RoomT{1} = datenum(x);
+
 %% Selecting range of log entries to average/fit 
 
 % Using min function to find the log entry closest to the time the spectra was taken, and then
 % selecting the 5 before and 5 after this log entry
 [~,Omega1index] = min(abs(Omega1{1} - spectradatetime));
 [~,Ch2index] = min(abs(Ch2{1} - spectradatetime));
+[~,RoomTindex] = min(abs(RoomT{1} - spectradatetime));
 
-if Omega1index+5 > length(Omega1{1}) || Ch2index+5 > length(Ch2{1})
+if Omega1index+5 > length(Omega1{1}) || Ch2index+5 > length(Ch2{1}) || RoomTindex+5 > length(RoomT{1})
     error('There aren''t enough Labview log entries immediately after the spectra to take an average. Wait a few seconds and try again.')
 end
 
@@ -188,9 +219,12 @@ Omega1{2} = Omega1{2}(Omega1index-5:Omega1index+5);
 Omega1{3} = Omega1{3}(Omega1index-5:Omega1index+5);
 Ch2{1} = Ch2{1}(Ch2index-5:Ch2index+5);
 Ch2{2} = Ch2{2}(Ch2index-5:Ch2index+5);
+RoomT{1} = RoomT{1}(RoomTindex-5:RoomTindex+5);
+RoomT{2} = RoomT{2}(RoomTindex-5:RoomTindex+5);
 
 Omega1{1} = string(datestr(Omega1{1}, formatOuttime));
 Ch2{1} = string(datestr(Ch2{1}, formatOuttime));
+RoomT{1} = string(datestr(RoomT{1}, formatOuttime));
 
 % Getting rid of zeros in selection
 idO1 = find(Omega1{3} == 0);
@@ -198,6 +232,8 @@ Omega1{1}(idO1) = [];
 Omega1{2}(idO1) = [];
 Ch2{1}(idO1) = [];
 Ch2{2}(idO1) = [];
+RoomT{1}(idO1) = [];
+RoomT{2}(idO1) = [];
 
 
 
@@ -205,6 +241,7 @@ Ch2{2}(idO1) = [];
 
 Omega1avg = sum(Omega1{2})/length(Omega1{2});
 Ch2avg = sum(Ch2{2})/length(Ch2{2});
+RoomTavg = sum(RoomT{2})/length(RoomT{2});
 
     if exist(Omega2filename)
         Omega2avg = sum(Omega2{2})/length(Omega2{2});
@@ -245,6 +282,15 @@ Ch2w = polyfit(Ch2t,Ch2{2},1);
 Ch2y = polyval(Ch2w,Ch2t); 
 interpCh2 = polyval(Ch2w,ttime);
 Ch2STD = std(Ch2{2});
+
+% RoomT
+RoomTtActual = datenum(char(RoomT{1}));
+RoomTt = datenum(char(RoomT{1}));
+RoomTt = (RoomTt - datenum(time))*1e4;
+RoomTw = polyfit(RoomTt,RoomT{2},1);
+RoomTy = polyval(RoomTw,RoomTt);
+interpRoomT = polyval(RoomTw,ttime);
+RoomTSTD = std(RoomT{2});
 
 
 
@@ -497,6 +543,8 @@ UltraSonicStrc.Omega1 = Omega1;
 UltraSonicStrc.Ch2 = Ch2;
 UltraSonicStrc.Omega1STD = O1STD;
 UltraSonicStrc.Ch2STD = Ch2STD;
+UltraSonicStrc.RoomT = RoomT;
+UltraSonicStrc.RoomTSTD = RoomTSTD;
 
     if exist(Omega2filename)
     UltraSonicStrc.Omega2 = Omega2;
@@ -507,7 +555,7 @@ UltraSonicStrc.Ch2STD = Ch2STD;
     end
 
 savename = UltraSonicStrc.filename;
-%save(savename, 'UltraSonicStrc')
+save(savename, 'UltraSonicStrc')
             
             
 end

@@ -2,9 +2,10 @@
 clear all; clc
 
 % parameters
-earliestExp = datetime(2017,1,1);
-ultraSonicDataDir = '/Volumes/SonicHD/Users/common/Ultrasonic Data/';
-%'/Users/penny/Documents/iSchool/BrownLab/Data/Ultrasonic Data/';
+earliestExp = datetime(2016,1,1);
+ultraSonicDataDir =  '/Users/penny/Documents/iSchool/BrownLab/Data/Ultrasonic Data/';
+%'/Volumes/SonicHD/Users/common/Ultrasonic Data/';
+
 
 % check that folder exists
 assert(exist(replace(ultraSonicDataDir,'%20',' '),'dir')==7, 'The UltraSonicData directory does not exist');
@@ -41,8 +42,11 @@ for ed = sort([exps.expStartDate],'descend')
     expDbFile = strcat(expPath,exp.name,'.mat');
     try
         load(expDbFile);    % loads into a variable 'data'
-        % immediately save a backup
-        save(strcat(expDbFile,backupSuffix),'data');
+        % immediately save a backup if one hasn't already been created
+        backupDBFile = strcat(expDbFile,backupSuffix);
+        if(exist(backupDBFile,'file')==0)
+            save(backupDBFile,'data');
+        end
     catch ME
         warning(['Unable to load or backup db for ' expPath]);
         continue    % go on to next experiment

@@ -1,7 +1,8 @@
 % Backfill Room Temperature data
+clear all; clc
 
 % parameters
-earliestExp = datetime(2017,6,1);
+earliestExp = datetime(2017,5,1);
 ultraSonicDataDir = '/Users/penny/Documents/iSchool/BrownLab/Data/Ultrasonic Data/';
 
 % check that folder exists
@@ -36,12 +37,17 @@ for ed = sort([exps.expStartDate],'descend')
     % load UltraSonicStrc database
     expPath = strcat(ultraSonicDataDir,exp.name,'/');
     expDbFile = strcat(expPath,exp.name,'.mat');
-    load(expDbFile);    % loads into a variable 'data'
+    try
+        load(expDbFile);    % loads into a variable 'data'
+    catch ME
+        warning(['Unable to load db for ' expPath]);
+        continue    % go on to next experiment
+    end
     rtFieldExists = isfield(data,'RoomT');
     lastRoomTDate = datetime('tomorrow');
     % for each spectrum 
-    for recordNum = 1:length(data)
-        spec = data(recordNum);
+    for specNum = 1:length(data)
+        spec = data(specNum);
         % only do anything if RoomT is empty or does not exist
         if(~rtFieldExists || isempty(spec.RoomT))
             %try
@@ -58,11 +64,19 @@ for ed = sort([exps.expStartDate],'descend')
                     disp(['        Since spectrum is before 3 am, using roomT data for ' datestr(loadRoomTDate,specDateStr)]);
                 end
                 if(lastRoomTDate ~= loadRoomTDate)
+                    missingData = 0;
                     lastRoomTDate = loadRoomTDate;
                     dStr = datestr(lastRoomTDate,specDateStr);
                     % import CH3 and Omega1 data for the date
                     roomTFile = strcat(expPath,dStr,roomTFileSuffix);
                     omega1File = strcat(expPath,dStr,omega1FileSuffix);
+                    
+                    % skip this spectrum if the needed files are missing
+                    if(exist(roomTFile,'file')~=2 || exist(omega1File,'file')~=2)
+                        warning(['Cannot find ' dStr ' CH3 or Omega1 file']);
+                        missingData = 1;
+                        continue
+                    end
                     
                     disp(['        Loading CH3 and Omega1 data for ' dStr]);
                     roomTData = importdata(roomTFile,'\t');
@@ -73,6 +87,11 @@ for ed = sort([exps.expStartDate],'descend')
                     omega1 = struct('time',datetime(omega1Data.textdata,'InputFormat',roomTTimeFmt),...
                         'pres',omega1Data.data(:,2));
                 end % end if(lastRoomTDate ~= loadRoomTDate)
+                
+                if(missingData == 1) % this will persist if the same file is sought 
+                    warning(['Missing T or P data - skipping spectrum ' spec.Filename]);
+                    continue
+                end
                 % select range of log entries surrounding the spectra
                 [~,roomTIdx] = min(abs(roomT.time - specTime));
                 [~,omega1Idx] = min(abs(omega1.time - specTime));
@@ -91,8 +110,8 @@ for ed = sort([exps.expStartDate],'descend')
                 interpRoomT = polyval(fitCoeffs,0); % get interpolated roomT for time = 0
                 roomTStd = std(specRoomTemps);
                 % update database RoomT and RoomTSTD
-                data(recordNum).RoomT = interpRoomT;
-                data(recordNum).RoomTSTD = roomTStd;
+                data(specNum).RoomT = interpRoomT;
+                data(specNum).RoomTSTD = roomTStd;
                 % save database
                 save(expDbFile, 'data');
 %             catch ME

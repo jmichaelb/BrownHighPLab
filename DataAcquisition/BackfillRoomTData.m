@@ -2,7 +2,7 @@
 clear all; clc
 
 % parameters
-earliestExp = datetime(2017,5,1);
+earliestExp = datetime(2017,1,1);
 ultraSonicDataDir = '/Volumes/SonicHD/Users/common/Ultrasonic Data/';
 %'/Users/penny/Documents/iSchool/BrownLab/Data/Ultrasonic Data/';
 
@@ -52,8 +52,12 @@ for ed = sort([exps.expStartDate],'descend')
     % for each spectrum 
     for specNum = 1:length(data)
         spec = data(specNum);
+        if(isempty(spec.SpectraTime) || isempty(spec.Filename))
+            warning(['No data for spectrum ' num2str(specNum)]);
+            continue
+        end
         % only do anything if RoomT is empty or does not exist
-        if(~rtFieldExists || isempty(spec.RoomT) && )
+        if(~rtFieldExists || isempty(spec.RoomT) )
             %try
                 % determine date/time for spectra
                 disp(['    Processing spectrum ' spec.Filename ' (' spec.SpectraTime ')']);

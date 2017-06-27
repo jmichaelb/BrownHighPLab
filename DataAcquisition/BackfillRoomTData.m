@@ -3,7 +3,8 @@ clear all; clc
 
 % parameters
 earliestExp = datetime(2017,5,1);
-ultraSonicDataDir = '/Users/penny/Documents/iSchool/BrownLab/Data/Ultrasonic Data/';
+ultraSonicDataDir = '/Volumes/SonicHD/Users/common/Ultrasonic Data/';
+%'/Users/penny/Documents/iSchool/BrownLab/Data/Ultrasonic Data/';
 
 % check that folder exists
 assert(exist(replace(ultraSonicDataDir,'%20',' '),'dir')==7, 'The UltraSonicData directory does not exist');
@@ -31,6 +32,7 @@ roomTFileSuffix = '_CH3.txt';
 roomTField = 'RoomT';
 roomTStdField = 'RoomTSTD';
 halfPtsToAvg = 5;
+backupSuffix = '.bak';
 for ed = sort([exps.expStartDate],'descend')
     exp = exps([exps.expStartDate]==ed);
     disp(['Backfilling data for experiment ' exp.name]);
@@ -39,17 +41,19 @@ for ed = sort([exps.expStartDate],'descend')
     expDbFile = strcat(expPath,exp.name,'.mat');
     try
         load(expDbFile);    % loads into a variable 'data'
+        % immediately save a backup
+        save(strcat(expDbFile,backupSuffix),'data');
     catch ME
-        warning(['Unable to load db for ' expPath]);
+        warning(['Unable to load or backup db for ' expPath]);
         continue    % go on to next experiment
-    end
+    end 
     rtFieldExists = isfield(data,'RoomT');
     lastRoomTDate = datetime('tomorrow');
     % for each spectrum 
     for specNum = 1:length(data)
         spec = data(specNum);
         % only do anything if RoomT is empty or does not exist
-        if(~rtFieldExists || isempty(spec.RoomT))
+        if(~rtFieldExists || isempty(spec.RoomT) && )
             %try
                 % determine date/time for spectra
                 disp(['    Processing spectrum ' spec.Filename ' (' spec.SpectraTime ')']);
@@ -97,9 +101,14 @@ for ed = sort([exps.expStartDate],'descend')
                 [~,omega1Idx] = min(abs(omega1.time - specTime));
                 % use a new construct for this spectra so you don't have to
                 % reload all the room T data for the date
-                specRoomTimes = roomT.time(roomTIdx-halfPtsToAvg:roomTIdx+halfPtsToAvg);
-                specRoomTemps = roomT.temp(roomTIdx-halfPtsToAvg:roomTIdx+halfPtsToAvg);
-                specPressures = omega1.pres(omega1Idx-halfPtsToAvg:omega1Idx+halfPtsToAvg);
+                % normally we would prevent the user from running the
+                % DataAcquisition script if there wasn't enough data, but
+                % this is a backfill, so just do the best you can with the
+                % data you have - start at the beginning if you have to,
+                % and end at the end if you have to
+                specRoomTimes = roomT.time(max(roomTIdx-halfPtsToAvg,1):min(roomTIdx+halfPtsToAvg,length(roomT.time)));
+                specRoomTemps = roomT.temp(max(roomTIdx-halfPtsToAvg,1):min(roomTIdx+halfPtsToAvg,length(roomT.temp)));
+                specPressures = omega1.pres(max(omega1Idx-halfPtsToAvg,1):min(omega1Idx+halfPtsToAvg,length(omega1.pres)));
                 % ignore data points corresponding to Omega1 0 pressures
                 hasValidP = find(specPressures ~= 0);
                 specRoomTimes = specRoomTimes(hasValidP);

@@ -1,0 +1,579 @@
+      SUBROUTINE HAAR (T,P, F,G,U,H,S,CV,CP,V,ALFA,BETA)
+C 
+      implicit REAL*8 (a-h,o-z)
+      COMMON /IDEAL/ F0,G0,U0,H0,S0,CV0,CP0 
+      COMMON /ALPHA/ A(9,7),AL,BET,GAM,B0,C,D,E,BB0,B1,B2,B4
+      COMMON /BETA/ ER,B,BT,BTT,BB,BBT,BBTT,Y,YR,YT,YTT
+      COMMON /GAS/ R
+      REAL*8 Q(18),LNT
+      DATA Q /20.9662681977,1973.0271018,-.483429455355,6.05743189245,
+     1   -68.3010170092,-106.4285576,-4.3135538513,.458155781,
+     2   -.047754901883,.0041238460633,-.00027929052852,1.4481695261E-5,
+     3   -5.6473658748E-7,1.6200446E-8,-3.303822796E-10,
+     4   4.51916067368E-12,-3.70734122708E-14,1.37546068238E-16/
+C 
+C 
+C **********************************************************************
+C *                                                                    *
+C *   HAAR CALCULATES THE THERMODYNAMIC PROPERTIES OF PURE WATER USING *
+C *   THE EQUATIONS OF HAAR, GALLAGHER AND KELL (NINTH INTERNATIONAL   *
+C *   CONFERENCE ON THE PROPERTIES OF STEAM, MUNICH, 1979).  THE TEMP- *
+C *   ERATURE T (IN KELVINS) AND PRESSURE P (IN 10**5 PA) MUST BE SET  *
+C *   BY THE CALLING ROUTINE BEFORE ENTERING HAAR.  THE EQUATIONS USED *
+C *   HEREIN ARE VALID FOR T .GT. 273.15 K AND PRESSURES TO 1 GPA.     *
+C *                                                                    *
+C *   THE QUANTITIES RETURNED BY HAAR ARE --                           *
+C *        F     HELMHOLTZ FREE ENERGY                                 *
+C *        G     GIBBS FREE ENERGY                                     *
+C *        U     INTERNAL ENERGY                                       *
+C *        H     ENTHALPY                                              *
+C *        S     ENTROPY                                               *
+C *        CV    HEAT CAPACITY AT CONSTANT VOLUME                      *
+C *        CP    HEAT CAPACITY AT CONSTANT PRESSURE                    *
+C *        V     VOLUME, IN CUBIC CENTIMETERS PER GRAM                 *
+C *        ALFA  EXPANSIVITY, PER KELVIN                               *
+C *        BETA  COMPRESSIBILITY, PER (10**5 PA)                       *
+C *                                                                    *
+C *   UNLESS OTHERWISE INDICATED, ALL QUANTITIES ARE DIMENSIONLESS.    *
+C *   THE HELMHOLTZ, GIBBS AND INTERNAL ENERGIES, THE ENTHALPY AND     *
+C *   ENTROPY ARE CALCULATED ON THE PRACTICAL ABSOLUTE SCALE, I.E. ARE *
+C *   REFERENCED TO 0 K AND 101325 PA WITH NEGLECT OF NUCLEAR SPIN     *
+C *   EFFECTS.  THE THERMODYNAMIC PROPERTIES OF WATER AS AN IDEAL GAS  *
+C *   AT (T,P) AND REFERENCED TO 0 K ARE GIVEN IN COMMON /IDEAL/, WITH *
+C *   SIMILAR DIMENSIONALITIES.                                        *
+C *                                                                    *
+C *                                   J. CHRISTOPHER PEIPER            *
+C *                                   29 MARCH, 1982                   *
+C *                                                                    *
+C **********************************************************************
+C 
+C 
+      CALL RHOH (T,P,V,VT,VTT,VP,VPP,VTP)
+C 
+      RH=1.0/V
+      TAU=T/647.073 
+      TT=T/100
+      LNT=LOG(T) 
+      GZ=-(Q(1)+Q(2)/T)*LNT 
+      HZ=Q(1)+Q(2)*(1-LNT)/T
+      CPZ=Q(1)-Q(2)/T 
+C 
+      DO 7 I=3,18 
+      GZ=GZ-Q(I)*TT**(I-6)
+      HZ=HZ+Q(I)*(I-6)*TT**(I-6)
+    7 CPZ=CPZ+Q(I)*(I-6)*(I-5)*TT**(I-6)
+      F0=GZ-1 
+      G0=GZ 
+      U0=HZ-1 
+      H0=HZ 
+      S0=H0-G0
+      CV0=CPZ-1 
+      CP0=CPZ 
+C 
+      FZ=F0 - LOG(1-Y) - (BET-1)/(1-Y) + (1+AL+BET)/(2*(1-Y)**2) 
+     1   + RH*(BB-GAM*B) - (AL-BET+3)/2 + LOG(R*RH*T/1.01325)
+      UZ=U0 + T*((1/(Y-1) + (BET-1)/(1-Y)**2 - (1+AL+BET)/(1-Y)**3) 
+     2               *YT
+     3   - RH*(BBT-GAM*BT)) 
+      CVZ=CV0 + 2*T*((1/(Y-1) + (BET-1)/(1-Y)**2
+     2      - (1+AL+BET)/(1-Y)**3)*YT - RH*(BBT-GAM*BT))
+     3   +T**2*((2*(BET-1)/(1-Y)**3 - 1/(1-Y)**2
+     4      - 3*(1+AL+BET)/(1-Y)**4)*YT**2
+     5      + (1/(Y-1) + (BET-1)/(1-Y)**2 - (1+AL+BET)/(1-Y)**3)*YTT
+     6      -RH*(BBTT-GAM*BTT)) 
+C 
+      DF=0
+      DU=0
+      DCV=0
+      DO 20 N=1,9 
+      S1=A(N,1) 
+      S2=A(N,1) 
+      S3=0
+C 
+      DO 17 J=2,7 
+      S1=S1+A(N,J)/TAU**(J-1) 
+      S2=S2+J*A(N,J)/TAU**(J-1) 
+   17 S3=S3+J*(1-J)*A(N,J)/TAU**(J-1) 
+C 
+      DF=DF+S1*(1-ER)**N/N
+      DU=DU+S2*(1-ER)**N/N
+   20 DCV=DCV+S3*(1-ER)**N/N
+C 
+      F=FZ+DF/(R*T) 
+      U=UZ+DU/(R*T) 
+      CV=CVZ+DCV/(R*T)
+      G=F+P*V/(R*T) 
+      H=U+P*V/(R*T) 
+      S=H-G 
+      CP=CV-T*VT**2/(VP*R)
+      ALFA=VT/V 
+      BETA=-VP/V
+C 
+      RETURN
+      END 
+      SUBROUTINE RHOH (T,P,V,VT,VTT,VP,VPP,VTP)
+C 
+      implicit REAL*8 (a-h,o-z)
+      COMMON /ALPHA/ A(9,7),AL,BET,GAM,B0,C,D,E,BB0,B1,B2,B4
+      COMMON /BETA/ ER,B,BT,BTT,BB,BBT,BBTT,Y,YR,YT,YTT 
+      COMMON /GAS/ R
+      DATA AL,BET,GAM /11.0,44.3333333,3.5/ 
+      DATA B0,C,D,E /.747862916,-.354078223,.007159876,-.003528426/ 
+      DATA BB0,B1,B2,B4 /1.127833441,-.594400123,-5.010995915,
+     1   .636842555/
+      DATA R /4.61518/
+      DATA A /0.0,0.0,68833.257944332,0.0,0.0,0.0,0.0,0.0,0.0,
+     1   -5306.2968529023,178638.32875422,-2563743.6613260, 
+     1      11797433.655832,-31377774.947767,46561826.115608, 
+     1      -31555231.392127,0.0,6962522.0862664, 
+     2   22744.901424408,-395147.31563338,4821257.5981415,
+     2      -21734810.110373,52911910.757704,-72752773.275387,
+     2      47929666.384584,0.0,-10834900.096447, 
+     3   -26627.944829770,0.0,217572.45522644,0.0,
+     3      -707304.18082074,0.0,0.0,0.0,0.0, 
+     4   7877.9333020687,338038.84280753,-3418301.6969660,
+     4      10829952.168620,-13802577.177877,4177424.6148294, 
+     4      4091266.4781209,0.0,-2272282.7401688, 
+     5   0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0, 
+     6   -698.30527374994,-138550.50202703,1222315.6417448, 
+     6      -2544199.8064049,-2510991.4369001,14016358.244614,
+     6      -13626369.388386,0.0,3836548.6000660/ 
+C 
+C 
+C **********************************************************************
+C *                                                                    *
+C *   RHOH CALCULATES THE DENSITY OF WATER AT THE SPECIFIED TEMPERATURE *
+C *   (T, IN KELVINS) AND PRESSURE (P, IN 10**5 PA), USING THE         *
+C *   EQUATIONS OF HAAR, GALLAGHER AND KELL (NINTH INTERNALTIONAL      *
+C *   CONFERENCE ON THE PROPERTIES OF STEAM, MUNICH, 1979).  THESE     *
+C *   EQUATIONS ARE VALID FOR TEMPERATURES .GE. 273.15 K  AND FOR
+C *   SATURATION PRESSURE .LE. P .LE. 100 MPA.  THE VOLUME (WHICH IS   *
+C *   SIMPLY THE RECIPROCAL OF THE DENSITY) AND ITS TEMPERATURE AND    *
+C *   PRESSURE DERIVATIVES ARE ALSO COMPUTED.  THE DENSITY HAS UNITS   *
+C *   OF GRAMS PER CUBIC CENTIMETER.                                   *
+C *                                                                    *
+C *                                    J. CHRISTOPHER PEIPER           *
+C *                                    29 MARCH, 1982                  *
+C *                                                                    *
+C **********************************************************************
+C 
+C 
+      TAU=T/647.073 
+      B=B0+C*LOG(TAU)+D/TAU**3+E/TAU**5
+      BT=(C-3*D/TAU**3-5*E/TAU**5)/T
+      BTT=-(C-12*D/TAU**3-30*E/TAU**5)/T**2 
+      BB=BB0+B1/TAU+B2/TAU**2+B4/TAU**4 
+      BBT=-(B1/TAU+2*B2/TAU**2+4*B4/TAU**4)/T 
+      BBTT=(2*B1/TAU+6*B2/TAU**2+20*B4/TAU**4)/T**2 
+      PS = 221
+      IF (TAU .LT. 1.0) PS = PSAT(T,DPDT)
+      RH = 1.0
+      IF (P .LT. PS) RH = 0.001
+C 
+      DO 30 I=1,100 
+      Y=RH*B/4
+      ER=EXP(-RH) 
+      PR=0
+      DPR=0
+C 
+      DO 15 N=1,9 
+      S=A(N,1)
+C 
+      DO 10 J=2,7 
+   10 S=S+A(N,J)/TAU**(J-1) 
+C 
+      PR=PR+S*(1-ER)**(N-1) 
+   15 DPR=DPR+S*(1-ER)**(N-1)*(2+RH*(N*ER-1)/(1-ER))
+C 
+      PR=RH**2*ER*PR+RH*R*T*((1+AL*Y+BET*Y**2)/(1-Y)**3+4*Y*(BB/B-GAM)) 
+      DPR=RH*ER*DPR + R*T*((1+2*AL*Y+3*BET*Y**2)/(1-Y)**3 
+     1      +3*Y*(1+AL*Y+BET*Y**2)/(1-Y)**4 + 8*Y*(BB/B-GAM)) 
+      RHN=RH+(P-PR)/DPR 
+      IF (ABS(RHN-RH).LT.ABS(RHN/1.E6).AND.ABS(P-PR).LT.ABS(P/1.E5))
+     1   GO TO 35 
+   30 RH=RHN
+C 
+      PRINT 100, T,P,RHN
+C 
+C 
+   35 RH=RHN
+      Y=RH*B/4
+      YT=RH*BT/4
+      YTT=RH*BTT/4
+      YR=B/4
+      ER=EXP(-RH) 
+      PR=0
+      DPR=0
+      DPT=0
+      DPRR=0
+      DPTT=0
+      DPRT=0
+C 
+      DO 50 N=1,9 
+      S=A(N,1)
+      S1=0 
+      S2=0
+C 
+      DO 40 J=2,7 
+      S=S+A(N,J)/TAU**(J-1) 
+      S1=S1+(1-J)*A(N,J)/TAU**(J-1) 
+   40 S2=S2+J*(J-1)*A(N,J)/TAU**(J-1) 
+C 
+      PR=PR+S*(1-ER)**(N-1) 
+      DPR=DPR+S*(2+RH*(N*ER-1)/(1-ER))*(1-ER)**(N-1)
+      DPT=DPT+S1*(1-ER)**(N-1)
+      DPRR=DPRR+S*((1+RH*(N*ER-1)/(1-ER))*(2+RH*(N*ER-1)/(1-ER))
+     1      *(1-ER)**(N-1)
+     2   +RH*(1-ER)**(N-2)*(N*ER*(1-RH)-1-RH*ER*(N*ER-1)/(1-ER))) 
+      DPTT=DPTT+S2*(1-ER)**(N-1)
+   50 DPRT=DPRT+S1*(2+RH*(N*ER-1)/(1-ER))*(1-ER)**(N-1) 
+C 
+      PR=RH**2*ER*PR+RH*R*T*((1+AL*Y+BET*Y**2)/(1-Y)**3 
+     1   +RH*(BB-GAM*B))
+      DPR=RH*ER*DPR+R*T*((1+2*AL*Y+3*BET*Y**2)/(1-Y)**3 
+     1   +3*Y*(1+AL*Y+BET*Y**2)/(1-Y)**4
+     2   +2*RH*(BB-GAM*B))
+      DPT=RH**2*ER*DPT/T+RH*R*((1+AL*Y+BET*Y**2)/(1-Y)**3 
+     1      +RH*(BB-GAM*B)) 
+     2   +RH*R*T*((AL+2*BET*Y)/(1-Y)**3 
+     3      +3*(1+AL*Y+BET*Y**2)/(1-Y)**4)*YT 
+     4   +RH**2*R*T*(BBT-GAM*BT)
+      DPTT=RH**2*ER*DPTT/T**2 
+     1   +2*RH*R*((AL+2*BET*Y)/(1-Y)**3 
+     2      +3*(1+AL*Y+BET*Y**2)/(1-Y)**4)*YT 
+     3   +2*RH**2*R*(BBT-GAM*BT)
+     4   +RH*R*T*(2*BET/(1-Y)**3+6*(AL+2*BET*Y)/(1-Y)**4
+     5      +12*(1+AL*Y+BET*Y**2)/(1-Y)**5)*YT**2 
+     6   +RH*R*T*((AL+2*BET*Y)/(1-Y)**3 
+     7      +3*(1+AL*Y+BET*Y**2)/(1-Y)**4)*YTT
+     8   +RH**2*R*T*(BBTT-GAM*BTT)
+      DPRR=ER*DPRR + 2*R*T*((AL+3*BET*Y)/(1-Y)**3 
+     1      +3*(1+2*AL*Y+3*BET*Y**2)/(1-Y)**4 
+     2      +6*Y*(1+AL*Y+BET*Y**2)/(1-Y)**5)*YR 
+     3   +2*R*T*(BB-GAM*B)
+      DPRT=RH*ER*DPRT/T + 2*RH*R*T*(BBT-GAM*BT) 
+     1   +R*((1+2*AL*Y+3*BET*Y**2)/(1-Y)**3 
+     2      +3*Y*(1+AL*Y+BET*Y**2)/(1-Y)**4 + 2*RH*(BB-GAM*B))
+     3   +2*R*T*((AL+3*BET*Y)/(1-Y)**3
+     4      +3*(1+2*AL*Y+3*BET*Y**2)/(1-Y)**4 
+     5      +6*Y*(1+AL*Y+BET*Y**2)/(1-Y)**5)*YT 
+C 
+      V=1/RH
+      VT=DPT/(RH**2*DPR)
+      VP=-1/(RH**2*DPR) 
+      VTT=2*(DPT/DPR)**2/RH**3 + DPTT/(DPR*RH**2) 
+     1   - 2.*DPRT*DPT/(RH*DPR)**2
+     3   +DPRR*DPT**2/(RH**2*DPR**3)
+      VPP=(2*DPR+RH*DPRR)/(RH*DPR)**3 
+      VTP=-2*DPT/(RH**3*DPR**2) - DPRR*DPT/(RH**2*DPR**3) 
+     1   + DPRT/(RH*DPR)**2 
+      RETURN
+C 
+C 
+  100 FORMAT ('0',5X,'At',F7.2,'K and',F10.4,'bars convergence of ',
+     1   'the density was not achieved --',/10X,'The density is',F8.6)
+      END 
+      SUBROUTINE DEBYE(T,P,AP,AH,AJ,AV,AA,AB) 
+      IMPLICIT REAL*8 (A-H,O-Z)
+      REAL*8 N0,K 
+      DATA PI,N0,E,K/3.141592658,6.022045E23,4.803242E-10,1.380662E-16/ 
+      DATA R /83.144/ 
+C     
+C
+C  *********************************************************************
+C  *                                                                   *
+C  *  DEBYE CALCULATES THE DEBYE-HUCKEL LIMITING-LAW SLOPES DEFINED BY *
+C  *  BRADLEY AND PITZER (J. PHYS. CHEM, 1979, 83, 1599).  THE VARIA-  *
+C  *  BLES T (TEMPERATURE, IN KELVINS) AND P (PRESSURE, IN 10**5 PA)   *
+C  *  MUST BE SET BY THE CALLING ROUTINE BEFORE ENTERING DEBYE.  THE   *
+C  *  EQUATIONS USED HEREIN ARE VALID FOR 273.15K .LE. T .LE. 623.15K  *
+C  *  AND SATURATION PRESSURE .LE. P .LE. 100 MPA.  IF THE PRESSURE    *
+C  *  GIVEN IS LESS THAN SATURATION, IT IS CORRECTED TO EXACTLY THE    *
+C  *  SATURATION PRESSURE.  SUBROUTINES DIELEC AND RHO ARE REQUIRED BY *
+C  *  DEBYE.                                                           *
+C  *                                                                   *
+C  *  DIMENSIONS ON THE LIMITING-LAW SLOPES ARE:                       *
+C  *       AP    (KG/MOL)**0.5                                         *
+C  *       AH    (KG/MOL)**0.5                                         *
+C  *       AJ    (KG/MOL)**0.5                                         *
+C  *       AV    CM**3 (KG/MOL)**0.5                                   *
+C  *       AA    CM**3 (KG/MOL)**0.5 K**(-1)                           *
+C  *       AB    CM**3 (KG/MOL)**0.5 (10**5 PA)**(-1)                  *
+C  *                                                                   *
+C  *                                      J. CHRISTOPHER PEIPER        *
+C  *                                      29 MARCH, 1982               *
+C  *                                                                   *
+C  ********************************************************************
+C
+C
+      CALL RHO (T,P,V,VT,VTT,VP,VPP,VTP)
+      CALL DIELEC (T,P,D,DT,DTT,DP,DPP,DTP) 
+C
+      AP=SQRT(2.*PI*N0/(1000.*V))*E**3/(D*K*T)**1.5/3. 
+      AH=-6.*T*AP*(DT/D +1./T + VT/(3.*V))
+      AJ=AH*T*(2/T-1.5*(DT/D+1/T+VT/(3*V))) - 6*T**2*AP*(DTT/D
+     1   -(DT/D)**2-1/T**2+VTT/(3*V)-(VT/V)**2/3) 
+      AV=2.*R*T*AP*(3.*DP/D + VP/V) 
+      AA=AV*(1.+AH/(4.*AP))/T 
+     1   +2.*R*T*AP*(3.*(DTP/D -DT*DP/D**2) 
+     2   +VTP/V  -VT*VP/V**2) 
+      AB=-AV**2/(4.*R*T*AP) 
+     1   +2.*R*T*AP*(3.*(DPP/D -(DP/D)**2) +VPP/V -(VP/V)**2) 
+C
+      RETURN
+      END 
+C
+C
+      SUBROUTINE DIELEC(T,P,D,DT,DTT,DP,DPP,DTP)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      DIMENSION U(9)
+      DATA U/342.79,-.0050866,9.4690E-7,-2.0525,3115.9,-182.89, 
+     1-8032.5,4.2142E6,2.1417/
+C  
+C
+C  *********************************************************************
+C  *                                                                   *
+C  *  DIELEC CALCULATES THE DIELECTRIC CONSTANT, ITS TEMPERATURE AND   *
+C  *  PRESSURE DERIVATIVES, ACCORDING TO THE EQUATIONS GIVEN BY        *
+C  *  BRADLEY AND PITZER (J. PHYS. CHEM., 1979, 83, 1599).  THE TEMP-  *
+C  *  ERATURE T, IN KELVINS, AND PRESSURE P, IN 10**5 PA, MUST BE SET  *
+C  *  BY THE CALLING ROUTINE BEFORE ENTERING DIELEC.  THE EQUATIONS    *
+C  *  USED HEREIN ARE VALID FOR 273.15K .LE. T .LE. 623.15K AND SATURA *
+C  *  TION PRESSURE .LE. P .LE. 100 MPA.                               *
+C  *                                    J. CHRISTOPHER PEIPER          *
+C  *                                                                   *
+C  *                                    29 MARCH, 1982                 *
+C  *                                                                   *
+C  *********************************************************************
+C
+C
+      B=U(7) + U(8)/T +U(9)*T 
+      BT=U(9)-U(8)/T**2 
+      BTT=2.*U(8)/T**3
+C
+      C=U(4)+U(5)/(U(6)+T)
+      CT=-U(5)/(U(6)+T)**2
+      CTT=2.*U(5)/(U(6)+T)**3 
+C
+      D1K=U(1)*EXP(U(2)*T+U(3)*T**2)
+      D1KT=(U(2) + 2.*U(3)*T)*D1K 
+      D1KTT=(2.*U(3)+(U(2)+2.*U(3)*T)**2)*D1K 
+C
+      D=D1K+C*LOG((B+P)/(B+1000.)) 
+      DT=D1KT+C*(1./(B+P)-1./(B+1000.))*BT + CT*LOG((B+P)/(B+1000.)) 
+      DTT=D1KTT-C*(1./(B+P)**2-1./(B+1000.)**2)*BT**2+(1./(B+P)-1./ 
+     1(B+1000.))*(2.*BT*CT + C*BTT)+CTT*LOG((B+P)/(B+1000.)) 
+      DP=C/(B+P)
+      DPP=-C/(B+P)**2 
+      DTP=-C*BT/(B+P)**2 + CT/(B+P) 
+C
+      RETURN
+      END 
+C
+C
+      SUBROUTINE RHO (T,P,V,VT,VTT,VP,VPP,VTP)
+      IMPLICIT REAL*8 (A-H,O-Z)
+C 
+      COMMON /ALPHA/ A(9,7),AL,BET,GAM,B0,C,D,E,BB0,B1,B2,B4
+      COMMON /BETA/ PS,DPDT,ER,B,BT,BTT,BB,BBT,BBTT,Y,YR,YT,YTT 
+      COMMON /GAS/ R
+      DATA AL,BET,GAM /11.0,44.3333333,3.5/ 
+      DATA B0,C,D,E /.747862916,-.354078223,.007159876,-.003528426/ 
+      DATA BB0,B1,B2,B4 /1.127833441,-.594400123,-5.010995915,
+     1   .636842555/
+      DATA R /4.61518/
+      DATA A /0.0,0.0,68833.257944332,0.0,0.0,0.0,0.0,0.0,0.0,
+     1   -5306.2968529023,178638.32875422,-2563743.6613260, 
+     1      11797433.655832,-31377774.947767,46561826.115608, 
+     1      -31555231.392127,0.0,6962522.0862664, 
+     2   22744.901424408,-395147.31563338,4821257.5981415,
+     2      -21734810.110373,52911910.757704,-72752773.275387,
+     2      47929666.384584,0.0,-10834900.096447, 
+     3   -26627.944829770,0.0,217572.45522644,0.0,
+     3      -707304.18082074,0.0,0.0,0.0,0.0, 
+     4   7877.9333020687,338038.84280753,-3418301.6969660,
+     4      10829952.168620,-13802577.177877,4177424.6148294, 
+     4      4091266.4781209,0.0,-2272282.7401688, 
+     5   0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0, 
+     6   -698.30527374994,-138550.50202703,1222315.6417448, 
+     6      -2544199.8064049,-2510991.4369001,14016358.244614,
+     6      -13626369.388386,0.0,3836548.6000660/ 
+C 
+C 
+C  *********************************************************************
+C  *                                                                   *
+C  *  RHO CALCULATES THE DENSITY OF WATER AT THE SPECIFIED TEMPERATURE *
+C  *  (T, IN KELVINS) AND PRESSURE (P, IN 10**5 PA), USING THE         *
+C  *  EQUATIONS OF HAAR, GALLAGHER AND KELL (NINTH INTERNATIONAL       *
+C  *  CONFERENCE ON THE PROPERTIES OF  STEAM, MUNICH, 1979).  THESE    *
+C  *  EQUATIONS ARE VALID FOR 273.15K .LE. T .LE. 623.15K AND SATURA-  *
+C  *  TION PRESSURE .LE. P .LE. 100 MPA.  THE VOLUME (WHICH IS SIMPLY  *
+C  *  THE RECIPROCAL OF THE DENSITY) AND ITS TEMPERATURE AND PRESSURE  *
+C  *  DERIVATIVES ARE ALSO COMPUTED.  THE DENSITY HAS UNITS OF GRAMS   *
+C  *  PER CUBIC CENTIMETER.                                            *
+C  *                                                                   *
+C  *                                    J. CHRISTOPHER PEIPER          *
+C  *                                    29 MARCH, 1982                 *
+C  *                                                                   *
+C  *********************************************************************
+C
+C
+      TAU=T/647.073 
+      PS=PSAT(T,DPDT) 
+      IF (P.LE.0) P=PS
+      B=B0+C*LOG(TAU)+D/TAU**3+E/TAU**5
+      BT=(C-3*D/TAU**3-5*E/TAU**5)/T
+      BTT=-(C-12*D/TAU**3-30*E/TAU**5)/T**2 
+      BB=BB0+B1/TAU+B2/TAU**2+B4/TAU**4 
+      BBT=-(B1/TAU+2*B2/TAU**2+4*B4/TAU**4)/T 
+      BBTT=(2*B1/TAU+6*B2/TAU**2+20*B4/TAU**4)/T**2 
+      RH=1.0
+      IF (P.LT.PS) RH=.001
+C 
+      DO 30 I=1,100 
+      Y=RH*B/4
+      ER=EXP(-RH) 
+      PR=0
+      DPR=0
+C 
+      DO 15 N=1,9 
+      S=A(N,1)
+C 
+      DO 10 J=2,7 
+   10 S=S+A(N,J)/TAU**(J-1) 
+C 
+      PR=PR+S*(1-ER)**(N-1) 
+   15 DPR=DPR+S*(1-ER)**(N-1)*(2+RH*(N*ER-1)/(1-ER))
+C 
+      PR=RH**2*ER*PR+RH*R*T*((1+AL*Y+BET*Y**2)/(1-Y)**3+4*Y*(BB/B-GAM)) 
+      DPR=RH*ER*DPR + R*T*((1+2*AL*Y+3*BET*Y**2)/(1-Y)**3 
+     1      +3*Y*(1+AL*Y+BET*Y**2)/(1-Y)**4 + 8*Y*(BB/B-GAM)) 
+      RHN=RH+(P-PR)/DPR 
+      IF (ABS(RHN-RH).LT.ABS(RHN/1.E6).AND.ABS(P-PR).LT.ABS(P/1.E5))
+     1   GO TO 35 
+   30 RH=RHN
+C 
+      PRINT 100, T,P,RHN
+C
+C      
+   35 RH=RHN
+      Y=RH*B/4
+      YT=RH*BT/4
+      YTT=RH*BTT/4
+      YR=B/4
+      ER=EXP(-RH) 
+      PR=0 
+      DPR=0
+      DPT=0
+      DPRR=0
+      DPTT=0
+      DPRT=0
+C 
+      DO 50 N=1,9 
+      S=A(N,1)
+      S1=0 
+      S2=0
+C 
+      DO 40 J=2,7 
+      S=S+A(N,J)/TAU**(J-1) 
+      S1=S1+(1-J)*A(N,J)/TAU**(J-1) 
+   40 S2=S2+J*(J-1)*A(N,J)/TAU**(J-1) 
+C 
+      PR=PR+S*(1-ER)**(N-1) 
+      DPR=DPR+S*(2+RH*(N*ER-1)/(1-ER))*(1-ER)**(N-1)
+      DPT=DPT+S1*(1-ER)**(N-1)
+      DPRR=DPRR+S*((1+RH*(N*ER-1)/(1-ER))*(2+RH*(N*ER-1)/(1-ER))
+     1      *(1-ER)**(N-1)
+     2   +RH*(1-ER)**(N-2)*(N*ER*(1-RH)-1-RH*ER*(N*ER-1)/(1-ER))) 
+      DPTT=DPTT+S2*(1-ER)**(N-1)
+   50 DPRT=DPRT+S1*(2+RH*(N*ER-1)/(1-ER))*(1-ER)**(N-1) 
+C 
+      PR=RH**2*ER*PR+RH*R*T*((1+AL*Y+BET*Y**2)/(1-Y)**3 
+     1   +RH*(BB-GAM*B))
+      DPR=RH*ER*DPR+R*T*((1+2*AL*Y+3*BET*Y**2)/(1-Y)**3 
+     1   +3*Y*(1+AL*Y+BET*Y**2)/(1-Y)**4
+     2   +2*RH*(BB-GAM*B))
+      DPT=RH**2*ER*DPT/T+RH*R*((1+AL*Y+BET*Y**2)/(1-Y)**3 
+     1      +RH*(BB-GAM*B)) 
+     2   +RH*R*T*((AL+2*BET*Y)/(1-Y)**3 
+     3      +3*(1+AL*Y+BET*Y**2)/(1-Y)**4)*YT 
+     4   +RH**2*R*T*(BBT-GAM*BT)
+      DPTT=RH**2*ER*DPTT/T**2 
+     1   +2*RH*R*((AL+2*BET*Y)/(1-Y)**3 
+     2      +3*(1+AL*Y+BET*Y**2)/(1-Y)**4)*YT 
+     3   +2*RH**2*R*(BBT-GAM*BT)
+     4   +RH*R*T*(2*BET/(1-Y)**3+6*(AL+2*BET*Y)/(1-Y)**4
+     5      +12*(1+AL*Y+BET*Y**2)/(1-Y)**5)*YT**2 
+     6   +RH*R*T*((AL+2*BET*Y)/(1-Y)**3 
+     7      +3*(1+AL*Y+BET*Y**2)/(1-Y)**4)*YTT
+     8   +RH**2*R*T*(BBTT-GAM*BTT)
+      DPRR=ER*DPRR + 2*R*T*((AL+3*BET*Y)/(1-Y)**3 
+     1      +3*(1+2*AL*Y+3*BET*Y**2)/(1-Y)**4 
+     2      +6*Y*(1+AL*Y+BET*Y**2)/(1-Y)**5)*YR 
+     3   +2*R*T*(BB-GAM*B)
+      DPRT=RH*ER*DPRT/T + 2*RH*R*T*(BBT-GAM*BT) 
+     1   +R*((1+2*AL*Y+3*BET*Y**2)/(1-Y)**3 
+     2      +3*Y*(1+AL*Y+BET*Y**2)/(1-Y)**4 + 2*RH*(BB-GAM*B))
+     3   +2*R*T*((AL+3*BET*Y)/(1-Y)**3
+     4      +3*(1+2*AL*Y+3*BET*Y**2)/(1-Y)**4 
+     5      +6*Y*(1+AL*Y+BET*Y**2)/(1-Y)**5)*YT 
+C 
+      V=1/RH
+      VT=DPT/(RH**2*DPR)
+      VP=-1/(RH**2*DPR) 
+      VTT=2*(DPT/DPR)**2/RH**3 + DPTT/(DPR*RH**2) 
+     1   - 2.*DPRT*DPT/(RH*DPR)**2
+     3   +DPRR*DPT**2/(RH**2*DPR**3)
+      VPP=(2*DPR+RH*DPRR)/(RH*DPR)**3 
+      VTP=-2*DPT/(RH**3*DPR**2) - DPRR*DPT/(RH**2*DPR**3) 
+     1   + DPRT/(RH*DPR)**2 
+      RETURN
+C 
+C 
+  100 FORMAT ('0',5X,'AT',F7.2,'K AND',F10.4,'BARS CONVERGENCE OF ',
+     1   'THE DENSITY WAS NOT ACHIEVED --',/10X,'THE DENSITY IS',F8.6)
+      END 
+C
+C
+      REAL*8 FUNCTION PSAT(T,DPDT) 
+C
+      REAL*8 A(8),B,Q,W,DPDT,R,Y,T,Z,PL,V
+      DATA A/-7.8889166E0,2.5514255E0,-6.716169E0 
+     1,33.239495E0,-105.38479E0,174.35319E0,-148.39348E0
+     2,48.631602E0/ 
+C
+C
+C  *********************************************************************
+C  *                                                                   *
+C  *  PSAT CALCULATES THE SATURATION PRESSURE AND ITS TEMPERATURE DERI *
+C  *  VATIVES AT THE INDICATED TEMPERATURE (IN KELVINS).  THE EQUATION *
+C  *  USED IS THAT OF HAAR, GALLAGHER AND KELL (NINTH INTERNATIONAL    *
+C  *  CONFERENCE ON THE PROPERTIES OF STEAM, MUNICH, 1979).            *
+C  *                                                                   *
+C  *                                      J. CHRISTOPHER PEIPER        *
+C  *                                      29 MARCH, 1982               *
+C  *********************************************************************
+C
+C
+      IF(T.GT.314.E0)GO TO 2
+      PL=6.3573118E0-8858.843E0/T+607.56335/T**.6 
+      PSAT=EXP(PL)
+      DPDT=EXP(PL)*(8858.843E0/T**2 - 0.6*607.56335/T**1.6) 
+      RETURN 
+C
+2     V=T/647.25
+      W=1.-V
+      B=0.
+      R=0.
+      DO 4 I=1,8
+      Z=I 
+      Y=A(I)*W**((Z+1.)/2.) 
+      R=R+(.5*Z+.5)*A(I)*W**((Z-1.)/2.) 
+   4  B=B+Y 
+      Q=B/V 
+         DPDT=220.93*EXP(Q)*(-R/V/647.25-B/V/V/647.25)
+      PSAT=220.93*EXP(Q)
+C
+      RETURN
+      END 
+

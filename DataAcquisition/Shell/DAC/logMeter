@@ -13,4 +13,7 @@ LOG_DT=$(date -ju -r ${DT} '+%F %T %Z')
 LOG_FILE=$(date -ju -r ${DT} "+${LOG_FILE_DIR}/%Y%m%d_${LOG_FILE_BASE}.txt")
 METRIC=`python parseMeterOutput.py -r "${METRIC_REGEX}" -o "${RAW_OUTPUT}"`
 rm $TEMP_OUT_FILE
-echo -e "$LOG_DT\t$METRIC" >> $LOG_FILE
+if test -n "${METRIC}"
+then
+  echo -e "$LOG_DT\t$METRIC" >> $LOG_FILE
+fi

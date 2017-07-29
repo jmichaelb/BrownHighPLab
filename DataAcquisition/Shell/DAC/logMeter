@@ -5,15 +5,19 @@ LOG_FILE_DIR="."
 LOG_FILE_BASE="DP41_Temp_Uncorrected"
 METRIC_REGEX="(?<="${METER_ADDR}")\d+\.\d+"
 
-TEMP_OUT_FILE=`mktemp -d -t ${METER_ADDR}ReadRaw`/tmpOut
-DT=`date +%s`
-curl --raw -m1 -N -H "Pragma: no-cache" --data-binary "@read${METER_ADDR}" -f -s -o "$TEMP_OUT_FILE" $IP_ADDR
-RAW_OUTPUT=`cat -v ${TEMP_OUT_FILE}`
-LOG_DT=$(date -ju -r ${DT} '+%F %T %Z')
-LOG_FILE=$(date -ju -r ${DT} "+${LOG_FILE_DIR}/%Y%m%d_${LOG_FILE_BASE}.txt")
-METRIC=`python parseMeterOutput.py -r "${METRIC_REGEX}" -o "${RAW_OUTPUT}"`
-rm $TEMP_OUT_FILE
-if test -n "${METRIC}"
-then
-  echo -e "$LOG_DT\t$METRIC" >> $LOG_FILE
-fi
+while true
+do
+  TEMP_OUT_FILE=`mktemp -d -t ${METER_ADDR}ReadRaw`/tmpOut
+  DT=`date +%s`
+  curl --raw -m1 -N -H "Pragma: no-cache" --data-binary "@read${METER_ADDR}" -f -s -o "$TEMP_OUT_FILE" $IP_ADDR
+  RAW_OUTPUT=`cat -v ${TEMP_OUT_FILE}`
+  LOG_DT=$(date -ju -r ${DT} '+%F %T %Z')
+  LOG_FILE=$(date -ju -r ${DT} "+${LOG_FILE_DIR}/%Y%m%d_${LOG_FILE_BASE}.txt")
+  METRIC=`python parseMeterOutput.py -r "${METRIC_REGEX}" -o "${RAW_OUTPUT}"`
+  rm $TEMP_OUT_FILE
+  if test -n "${METRIC}"
+  then
+    echo -e "$LOG_DT\t$METRIC" >> $LOG_FILE
+  fi
+  sleep $READ_INTERVAL_SECS
+done

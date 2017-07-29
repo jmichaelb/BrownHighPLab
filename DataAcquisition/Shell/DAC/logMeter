@@ -3,9 +3,9 @@ METER_ADDR="X01"
 READ_INTERVAL_SECS=5
 LOG_FILE_DIR="."
 LOG_FILE_BASE="DP41_Temp_Uncorrected"
-METRIC_REGEX='(?<='${METER_ADDR}')\d+\.\d+'
+METRIC_REGEX="(?<="${METER_ADDR}")\d+\.\d+"
 
-TEMP_OUT_DIR=`mktemp -d -t ${METER_ADDR}ReadRaw`/tmpOut
+TEMP_OUT_FILE=`mktemp -d -t ${METER_ADDR}ReadRaw`/tmpOut
 DT=`date +%s`
 curl --raw -m1 -N -H "Pragma: no-cache" --data-binary "@read${METER_ADDR}" -f -s -o "$TEMP_OUT_FILE" $IP_ADDR
 RAW_OUTPUT=`cat -v ${TEMP_OUT_FILE}`

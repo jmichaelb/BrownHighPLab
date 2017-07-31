@@ -11,6 +11,7 @@ do
   DT=`date +%s`
   curl --raw -m1 -N -H "Pragma: no-cache" --data-binary "@read${METER_ADDR}" -f -s -o "$TEMP_OUT_FILE" $IP_ADDR
   if test -f "${TEMP_OUT_FILE}"
+  then
     RAW_OUTPUT=`cat -v ${TEMP_OUT_FILE}`
     METRIC=`python parseMeterOutput.py -r "${METRIC_REGEX}" -o "${RAW_OUTPUT}"`
     if test -n "${METRIC}"

@@ -44,11 +44,11 @@ then
   exit 1
 fi
 
-LOG_FILE_DIR="./x${EXP_ID}"
+LOG_FILE_DIR="./${EXP_ID}"
 LOG_FILE_BASE="DP41-${METER_ADDR}_Uncorrected"
 METRIC_REGEX="(?<="${METER_ADDR}")\d+\.\d+"
 
-if [[ ! -d "$LOG_FILE_DIR" ]]
+if [[ ! -d $LOG_FILE_DIR ]]
 then
   mkdir $LOG_FILE_DIR
 fi

@@ -1,8 +1,51 @@
-IP_ADDR="192.168.1.200:2000"
+#!/bin/bash
+
+# This script logs data from a universal Omega meter equipped with
+# an Ethernet card and logs the data in a tab-delimited text file.
+
+usage() {
+  echo "Usage: $0 -x <experiment-id>" 
+  echo "          [-r <meter-read-address>] [-i <read-interval-seconds>]"
+  echo "          [-d] <meter-ip-address>[:port]"
+  echo "By default, readings will be taken from the X01 meter at 5 second intervals.  These settings can be"
+  echo "changed using the -r and -i options, respectively."
+  echo "Log files will be created in an experiment-specific subdirectory of the current working directory."
+  echo "If the -d option is included, separate log files will be created for each UTC day.  Otherwise, all"
+  echo "logs for the day will be in a single log file."
+  echo "i.e., ./x<experiment-id>/[YYYYMMDD_]DP41-<meter-read-address>_Uncorrected.txt"
+  echo "Log files are tab-delimited text files, with the first column the UTC date and the second column "
+  echo "containing the meter reading."
+}
+
+# set defaults
 METER_ADDR="X01"
 READ_INTERVAL_SECS=5
-LOG_FILE_DIR="."
-LOG_FILE_BASE="DP41_Temp_Uncorrected"
+INCL_DAY_IN_FNAME=0
+
+while getopts x:r:i:d opt
+do
+  case $opt in
+    x )  EXP_ID=$OPTARG;;
+    r )  METER_ADDR=$OPTARG;;
+    i )  READ_INTERVAL_SECS=$OPTARG;;
+    d )  INCL_DAY_IN_FNAME=1;;
+  esac
+done
+
+shift $(($OPTIND - 1))
+
+IP_ADDR=$1
+
+if [[ ! -n "${IP_ADDR}" || ! -n "${EXP_ID}" ]]
+then
+  echo "ERROR: You did not provide an IP address and/or experiment identifier."
+  echo
+  usage
+  exit 1
+fi
+
+LOG_FILE_DIR="./x${EXP_ID}"
+LOG_FILE_BASE="DP41-${METER_ADDR}_Uncorrected"
 METRIC_REGEX="(?<="${METER_ADDR}")\d+\.\d+"
 
 while true
@@ -10,13 +53,18 @@ do
   TEMP_OUT_FILE=`mktemp -d -t ${METER_ADDR}ReadRaw`/tmpOut
   DT=`date +%s`
   curl --raw -m1 -N -H "Pragma: no-cache" --data-binary "@read${METER_ADDR}" -f -s -o "$TEMP_OUT_FILE" $IP_ADDR
-  if test -f "${TEMP_OUT_FILE}"
+  if [[ -f "${TEMP_OUT_FILE}" ]]
   then
     RAW_OUTPUT=`cat -v ${TEMP_OUT_FILE}`
     METRIC=`python parseMeterOutput.py -r "${METRIC_REGEX}" -o "${RAW_OUTPUT}"`
-    if test -n "${METRIC}"
+    if [[ -n "${METRIC}" ]]
     then
-      LOG_FILE=$(date -ju -r ${DT} "+${LOG_FILE_DIR}/%Y%m%d_${LOG_FILE_BASE}.txt")
+      if [[ $INCL_DAY_IN_FNAME -eq 1 ]]
+      then
+        LOG_FILE=$(date -ju -r ${DT} "+${LOG_FILE_DIR}/%Y%m%d_${LOG_FILE_BASE}.txt")
+      else 
+        LOG_FILE="${LOG_FILE_DIR}/${LOG_FILE_BASE}.txt"
+      fi
       LOG_DT=$(date -ju -r ${DT} '+%F %T %Z')
       echo -e "$LOG_DT\t$METRIC" >> $LOG_FILE
     fi

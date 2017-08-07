@@ -3,12 +3,14 @@
 import pycurl, cStringIO, os, sys
 from re import search
 from getopt import getopt
-from datetime import datetime
+from datetime import datetime, timedelta
 from time import sleep
 
+# used in testing only
 from random import uniform
 
-verbose = False
+import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
 
 
 def getReading(url, device, timeout_ms=1000):
@@ -140,7 +142,7 @@ def getParms(parms=sys.argv[1:]):
            'logDir': os.getcwd(),
            'devId': 'X01',
            'readInt': 5,
-           'plotLookback': 2.0,
+           'lookback': 2.0,
            'lfIncludesDate': False}
     opts, args = getopt(parms, 'x:p:u:r:i:l:dv')
     for opt, arg in opts:
@@ -169,6 +171,27 @@ def printOpts(parms, parsePattern, expDir):
         print '\t'+k+': '+repr(parms[k])
     print '\tparsePattern: '+parsePattern
     print '\texperiementLogDir: '+expDir
+
+def updateReadings(lookbackHrs, readings, newReading):
+    """Updates an array of readings by adding a new reading and removing readings predating the lookback period
+
+    :param lookbackHrs: float detailing the number of hours to keep
+    :param readings: existing readings
+    :param newReading: the latest reading as a tuple (readTime:datetime, reading:float)
+    :return: a new array of readings
+    """
+    readings.append(newReading)
+    mins = (lookbackHrs - int(lookbackHrs))*60.0
+    earliestData = datetime.utcnow() - timedelta(hours=int(lookbackHrs),minutes=int(mins))
+    return [r for r in readings if r[0] >= earliestData]
+
+# def animate(readings):
+#     x = [r[0] for r in readings]
+#     y = [r[1] for r in readings]
+#     line.set_data(x,y)
+#     ax.set_xlim(x[0], x[-1])
+#     ax.set_ylim(min(y), max(y))
+#     return line,
 
 
 def main():
@@ -208,16 +231,33 @@ def test():
     if verbose:
         printOpts(parms, devPattern, expDir)
 
+    readings = []
+    # ani = FuncAnimation(fig, animate, frames=readings, interval=int(parms['readInt']))
+
+
     #try :
     while True:
+        # take the reading
         (readTime, rawRead) = getFakeReading(parms['devId'])
         reading = parseReading(rawRead, devPattern)
+        # log the reading
         logFileName = getLogFileName(expDir, parms['devId'], readTime, parms['lfIncludesDate'])
         logReading(logFileName, readTime, reading)
-        # update plot
+        # plot the reading
+        readings = updateReadings(parms['lookback'], readings, (readTime, reading))
+        print readings
+        # plt.show()
         sleep(parms['readInt'])
     # except:
     #     # close plots
     #     print 'error'
 
+verbose = False
+# fig, ax = plt.subplots()
+# fig.autofmt_xdate()
+# line, = ax.plot([])
+
 test()
+
+# if __name__ == "__main__":
+#     main()

@@ -4,6 +4,9 @@ import pycurl, cStringIO, os, sys
 from re import search
 from getopt import getopt
 from datetime import datetime
+from time import sleep
+
+from random import uniform
 
 verbose = False
 
@@ -97,9 +100,8 @@ def logReading(logFile, readTime, reading):
     :return:
     """
     ll = readTime.strftime('%Y-%m-%d %H:%M:%S UTC')+'\t'+repr(reading)+'\n'
-    print ll
     try:
-        with open(logFile, 'w') as lf:
+        with open(logFile, 'a') as lf:
             lf.write(ll)
     except:
         if verbose:
@@ -161,23 +163,61 @@ def getParms(parms=sys.argv[1:]):
             verbose = True
     return out
 
+def printOpts(parms, parsePattern, expDir):
+    print 'running with options:'
+    for k in iter(parms.keys()):
+        print '\t'+k+': '+repr(parms[k])
+    print '\tparsePattern: '+parsePattern
+    print '\texperiementLogDir: '+expDir
+
+
 def main():
     parms = getParms()
     if 'expId' not in parms:
         raise ValueError('You must provide an experiment id (-x parameter).')
     devPattern = getParsePattern(parms['devId'])
     expDir = mkExperimentDir(parms['logDir'], parms['expId'])
+    if verbose:
+        printOpts(parms, devPattern, expDir)
 
     try :
-        while true:
+        while True:
             (readTime, rawRead) = getReading(parms['url'], parms['devId'])
             reading = parseReading(rawRead, devPattern)
             logFileName = getLogFileName(expDir, parms['devId'], readTime, parms['lfIncludesDate'])
             logReading(logFileName, readTime, reading)
             # update plot
-            time.sleep(parms['readInt'])
+            sleep(parms['readInt'])
     except:
-        # close files
         # close plots
-        print "error"
+        print 'error'
 
+def getFakeReading(device):
+    """FOR TESTING ONLY - Needs to return same output as getReading"""
+    readTime = datetime.utcnow()
+    fakeReading = '?43^M'+device+'00000'+repr(round(uniform(20,25),1))+'^M'
+    return (readTime, fakeReading)
+
+
+def test():
+    parms = getParms()
+    if 'expId' not in parms:
+        raise ValueError('You must provide an experiment id (-x parameter).')
+    devPattern = getParsePattern(parms['devId'])
+    expDir = mkExperimentDir(parms['logDir'], parms['expId'])
+    if verbose:
+        printOpts(parms, devPattern, expDir)
+
+    #try :
+    while True:
+        (readTime, rawRead) = getFakeReading(parms['devId'])
+        reading = parseReading(rawRead, devPattern)
+        logFileName = getLogFileName(expDir, parms['devId'], readTime, parms['lfIncludesDate'])
+        logReading(logFileName, readTime, reading)
+        # update plot
+        sleep(parms['readInt'])
+    # except:
+    #     # close plots
+    #     print 'error'
+
+test()

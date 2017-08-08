@@ -77,18 +77,14 @@ def mkExperimentDir(parentPath, expId):
         os.mkdir(expDirStr)
     return expDirStr
 
-def getLogFileName(expDir, device, readTime, prependDate):
+def getLogFileName(expDir, device):
     """Returns the target file name for the log data
 
     :param expDir: the path in which data for the current experiment is logged
     :param device: the identifier for the device being read
-    :param readTime: the datetime object for the time the reading was taken
-    :param prependDate: True to prepend YYYYMMDD to the beginning of the log file
     :return: the full path, including file name, to which data will be logged
     """
     logFileName = expDir+'/'
-    if prependDate:
-        logFileName = logFileName + readTime.strftime('%Y%m%d') + '_'
     return logFileName+'DP41-'+device+'_Uncorrected.txt'
 
 
@@ -96,7 +92,6 @@ def logReading(logFile, readTime, reading):
     """Appends new reading to a tab-delimited log
 
     :param logFile: full path of the log file (see getLogFileName)
-    :param readTime: datetime object with time of the reading being added
     :param reading:
     :return:
     """
@@ -128,8 +123,6 @@ def getParms(parms=sys.argv[1:]):
             if used, option value integer required
     -l      lookback interval for plotting readings, in hours (default 2)
             float value is acceptable
-    -d      when present, indicates that YYYYMMDD will be prepended to log file names (default False)
-            no option value supported
     -v      verbose output (this will NOT output readings but it will no longer fail silently)
     -t      test mode - does not call the meter but makes up fake readings between 20 and 25
 
@@ -142,9 +135,8 @@ def getParms(parms=sys.argv[1:]):
            'logDir': os.getcwd(),
            'devId': 'X01',
            'readInt': 5,
-           'lookback': 2.0,
-           'lfIncludesDate': False}
-    opts, args = getopt(parms, 'x:p:u:r:i:l:dvt')
+           'lookback': 2.0}
+    opts, args = getopt(parms, 'x:p:u:r:i:l:vt')
     for opt, arg in opts:
         if opt == '-x':
             out['expId'] = arg
@@ -158,8 +150,6 @@ def getParms(parms=sys.argv[1:]):
             out['readInt'] = int(arg)
         elif opt == '-l':
             out['lookback'] = float(arg)
-        elif opt == '-d':
-            out['lfIncludesDate'] = True
         elif opt == '-v':
             global verbose
             verbose = True
@@ -173,8 +163,6 @@ def printOpts(parms, parsePattern, expDir):
     print 'running with options:'
     for k in iter(parms.keys()):
         print '\t'+k+': '+repr(parms[k])
-    print '\tparsePattern: '+parsePattern
-    print '\texperimentLogDir: '+expDir
 
 
 def updateReadings(lookbackHrs, readings, newReadTime, newReading):
@@ -251,13 +239,14 @@ def main():
         raise ValueError('You must provide an experiment id (-x parameter).')
     devPattern = getParsePattern(parms['devId'])
     expDir = mkExperimentDir(parms['logDir'], parms['expId'])
+    logFileName = getLogFileName(expDir, parms['devId'])
     if verbose:
         printOpts(parms, devPattern, expDir)
 
     global readings
 
     # keep reference to animation obj so not garbage collected
-    ani = FuncAnimation(fig, animate, read('/Users/penny/Documents/iSchool/BrownLab/Scripts/BrownHighPLab/DataAcquisition/Python/DAC/DAC-20170807/DP41-X01_Uncorrected.txt'), interval=int(parms['readInt'])*1200)
+    ani = FuncAnimation(fig, animate, read(logFileName), interval=int(parms['readInt'])*1200)
     plt.show()
 
     try :
@@ -265,11 +254,8 @@ def main():
             # take the reading
             (readTime, rawRead) = getReading(parms['url'], parms['devId']) if not testMode else getFakeReading(parms['devId'])
             reading = parseReading(rawRead, devPattern)
-            # log the reading
-            logFileName = getLogFileName(expDir, parms['devId'], readTime, parms['lfIncludesDate'])
             logReading(logFileName, readTime, reading)
             # plot the reading
-            #readings = updateReadings(parms['lookback'], readings, readTime, reading)
             sleep(parms['readInt'])
     except Exception as e:
         plt.close(fig)

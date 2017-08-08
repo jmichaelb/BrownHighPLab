@@ -209,7 +209,10 @@ def read(logFile):
             line = f.readline()
             sleep(0.1)
             if line:
-                data.append(float(line.split('\t')[1]))
+                (tm,tp) = line.split('\t')
+                readTime = datetime.strptime(tm,logTimeFormat)
+                reading = float(tp)
+                data.append((readTime, reading))
                 yield data
 
 
@@ -221,10 +224,11 @@ def read(logFile):
 #     return curve,
 
 def animate(values):
-    x = list(range(len(values)))
-    line.set_data(x, values)
+    x = [r[0] for r in values]
+    y = [r[1] for r in values]
+    line.set_data(x, y)
     ax.set_xlim(x[0], x[-1])
-    ax.set_ylim(min(values), max(values))
+    ax.set_ylim(min(y), max(y))
     return line,
 
 def getFakeReading(device):
@@ -255,7 +259,6 @@ def main():
             (readTime, rawRead) = getReading(parms['url'], parms['devId']) if not testMode else getFakeReading(parms['devId'])
             reading = parseReading(rawRead, devPattern)
             logReading(logFileName, readTime, reading)
-            # plot the reading
             sleep(parms['readInt'])
     except Exception as e:
         plt.close(fig)
@@ -270,11 +273,11 @@ testMode = False
 logTimeFormat = '%Y-%m-%d %H:%M:%S UTC'
 
 # set up plot, use date format for x-axis, create empty plot
-# fig, ax = plt.subplots()
-# fig.autofmt_xdate()
-# line, = ax.plot([])
 fig, ax = plt.subplots()
+fig.autofmt_xdate()
 line, = ax.plot([])
+# fig, ax = plt.subplots()
+# line, = ax.plot([])
 
 
 if __name__ == "__main__":

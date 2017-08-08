@@ -22,6 +22,8 @@ def getReading(url, device, timeout_ms=1000):
     :return: returns a 2-tuple containing the (1) time of the reading as a datetime object and
         (2) a string with the raw output from the meter
     """
+    # don't use try block here - the perform WILL ERROR
+    # manually throw an error if nothing is in the buffer
     try:
         c = pycurl.Curl()
         c.setopt(c.URL, url)
@@ -32,13 +34,11 @@ def getReading(url, device, timeout_ms=1000):
         c.setopt(c.WRITEDATA, buffer)
         readTime = datetime.utcnow()
         c.perform()
+    finally:
+        rawReading = buffer.getvalue()  # timeout throws error - must do this in finally block
         c.close()
-        rawReading = buffer.getvalue()
         buffer.close()
-        return (readTime, rawReading)
-    except Exception as e:
-        if verbose:
-            print 'Failed to read data from meter at '+dt.datetime.now()+':\n\t'+e
+        return readTime, rawReading
 
 
 def parseReading(rawReading, extractPattern, targetGroup=0):
@@ -165,20 +165,20 @@ def printOpts(parms, parsePattern, expDir):
         print '\t'+k+': '+repr(parms[k])
 
 
-def updateReadings(lookbackHrs, readings, newReadTime, newReading):
-    """Updates an array of readings by adding a new reading and removing readings predating the lookback period
-
-    :param lookbackHrs: float detailing the number of hours to keep
-    :param readings: existing readings
-    :param newReadTime: datetime of the newReading
-    :param newReading: the latest reading as float
-    :return: a new array of readings
-    """
-    readings.append((newReadTime,newReading))
-    hrs = int(lookbackHrs)
-    mins = int((lookbackHrs - hrs) * 60)
-    earliestData = datetime.utcnow() - timedelta(hours=hrs, minutes=mins)
-    return [r for r in readings if r[0] >= earliestData]
+# def updateReadings(lookbackHrs, readings, newReadTime, newReading):
+#     """Updates an array of readings by adding a new reading and removing readings predating the lookback period
+#
+#     :param lookbackHrs: float detailing the number of hours to keep
+#     :param readings: existing readings
+#     :param newReadTime: datetime of the newReading
+#     :param newReading: the latest reading as float
+#     :return: a new array of readings
+#     """
+#     readings.append((newReadTime,newReading))
+#     hrs = int(lookbackHrs)
+#     mins = int((lookbackHrs - hrs) * 60)
+#     earliestData = datetime.utcnow() - timedelta(hours=hrs, minutes=mins)
+#     return [r for r in readings if r[0] >= earliestData]
 
 # def getReadings(logFileName, lookbackHrs):
 #     """Reads data from the specified log file and add it to the data to be graphed
@@ -231,11 +231,17 @@ def animate(values):
     ax.set_ylim(min(y), max(y))
     return line,
 
+def takeReading(parms, devPattern, logFileName):
+    readTime, rawRead = getReading(parms['url'], parms['devId']) if not testMode else getFakeReading(parms['devId'])
+    reading = parseReading(rawRead, devPattern)
+    logReading(logFileName, readTime, reading)
+
+
 def getFakeReading(device):
     """FOR TESTING ONLY - Needs to return same output as getReading"""
     readTime = datetime.utcnow()
     fakeReading = '?43^M'+device+'00000'+repr(round(uniform(20,25),1))+'^M'
-    return (readTime, fakeReading)
+    return readTime, fakeReading
 
 def main():
     parms = getParms()
@@ -244,10 +250,17 @@ def main():
     devPattern = getParsePattern(parms['devId'])
     expDir = mkExperimentDir(parms['logDir'], parms['expId'])
     logFileName = getLogFileName(expDir, parms['devId'])
+
     if verbose:
         printOpts(parms, devPattern, expDir)
 
     global readings
+
+    # take a few readings before starting animation
+    # doesn't handle empty file well
+    for i in range(10):
+        takeReading(parms, devPattern, logFileName)
+        sleep(2)
 
     # keep reference to animation obj so not garbage collected
     ani = FuncAnimation(fig, animate, read(logFileName), interval=int(parms['readInt'])*1200)
@@ -255,10 +268,7 @@ def main():
 
     try :
         while True:
-            # take the reading
-            (readTime, rawRead) = getReading(parms['url'], parms['devId']) if not testMode else getFakeReading(parms['devId'])
-            reading = parseReading(rawRead, devPattern)
-            logReading(logFileName, readTime, reading)
+            takeReading(parms, devPattern, logFileName)
             sleep(parms['readInt'])
     except Exception as e:
         plt.close(fig)

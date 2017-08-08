@@ -41,7 +41,6 @@ def getReading(url, device, timeout_ms=1000):
             print 'Failed to read data from meter at '+dt.datetime.now()+':\n\t'+e
 
 
-
 def parseReading(rawReading, extractPattern, targetGroup=0):
     """ Parses the raw reading and returns the actual reading as a float
 
@@ -101,7 +100,7 @@ def logReading(logFile, readTime, reading):
     :param reading:
     :return:
     """
-    ll = readTime.strftime('%Y-%m-%d %H:%M:%S UTC')+'\t'+repr(reading)+'\n'
+    ll = readTime.strftime(logTimeFormat)+'\t'+repr(reading)+'\n'
     try:
         with open(logFile, 'a') as lf:
             lf.write(ll)
@@ -132,6 +131,7 @@ def getParms(parms=sys.argv[1:]):
     -d      when present, indicates that YYYYMMDD will be prepended to log file names (default False)
             no option value supported
     -v      verbose output (this will NOT output readings but it will no longer fail silently)
+    -t      test mode - does not call the meter but makes up fake readings between 20 and 25
 
     :param parms: the list of parameters passed to this script.  Defaults to sys.arg[1:]
     :return: a dictionary with output parameters, including defaults
@@ -144,7 +144,7 @@ def getParms(parms=sys.argv[1:]):
            'readInt': 5,
            'lookback': 2.0,
            'lfIncludesDate': False}
-    opts, args = getopt(parms, 'x:p:u:r:i:l:dv')
+    opts, args = getopt(parms, 'x:p:u:r:i:l:dvt')
     for opt, arg in opts:
         if opt == '-x':
             out['expId'] = arg
@@ -163,6 +163,10 @@ def getParms(parms=sys.argv[1:]):
         elif opt == '-v':
             global verbose
             verbose = True
+        elif opt == '-t':
+            global testMode
+            testMode = True
+            print '!!!!! TEST MODE !!!!!'
     return out
 
 def printOpts(parms, parsePattern, expDir):
@@ -170,29 +174,76 @@ def printOpts(parms, parsePattern, expDir):
     for k in iter(parms.keys()):
         print '\t'+k+': '+repr(parms[k])
     print '\tparsePattern: '+parsePattern
-    print '\texperiementLogDir: '+expDir
+    print '\texperimentLogDir: '+expDir
 
-def updateReadings(lookbackHrs, readings, newReading):
+
+def updateReadings(lookbackHrs, readings, newReadTime, newReading):
     """Updates an array of readings by adding a new reading and removing readings predating the lookback period
 
     :param lookbackHrs: float detailing the number of hours to keep
     :param readings: existing readings
-    :param newReading: the latest reading as a tuple (readTime:datetime, reading:float)
+    :param newReadTime: datetime of the newReading
+    :param newReading: the latest reading as float
     :return: a new array of readings
     """
-    readings.append(newReading)
-    mins = (lookbackHrs - int(lookbackHrs))*60.0
-    earliestData = datetime.utcnow() - timedelta(hours=int(lookbackHrs),minutes=int(mins))
+    readings.append((newReadTime,newReading))
+    hrs = int(lookbackHrs)
+    mins = int((lookbackHrs - hrs) * 60)
+    earliestData = datetime.utcnow() - timedelta(hours=hrs, minutes=mins)
     return [r for r in readings if r[0] >= earliestData]
 
-# def animate(readings):
-#     x = [r[0] for r in readings]
-#     y = [r[1] for r in readings]
-#     line.set_data(x,y)
-#     ax.set_xlim(x[0], x[-1])
-#     ax.set_ylim(min(y), max(y))
-#     return line,
+# def getReadings(logFileName, lookbackHrs):
+#     """Reads data from the specified log file and add it to the data to be graphed
+#     if it is within the lookbackHrs interval
+#
+#     :param logFileName:
+#     :param lookbackHrs:
+#     :return:
+#     """
+#     hrs = int(lookbackHrs)
+#     lookback = timedelta(hours=hrs, minutes=int((lookbackHrs - hrs)*60))
+#     with open(logFileName,'r') as lf:
+#         data = []
+#         while True:
+#             line = lf.readline()
+#             sleep(.1)
+#             if line:
+#                 (tm,tp) = line.split('\t')
+#                 readTime = datetime.strptime(tm,logTimeFormat)
+#                 if readTime >= (datetime.utcnow() - lookback):
+#                     data.append((readTime, float(tp)))
+#                     yield data
 
+def read(logFile):
+    with open(logFile,'r') as f:
+        data = []
+        while True:
+            line = f.readline()
+            sleep(0.1)
+            if line:
+                data.append(float(line.split('\t')[1]))
+                yield data
+
+
+
+# def animate(reading):
+#     curve.set_ydata(reading)
+#     #ax.set_xlim(x[0], x[-1])
+#     ax.set_ylim(min(y), max(y))
+#     return curve,
+
+def animate(values):
+    x = list(range(len(values)))
+    line.set_data(x, values)
+    ax.set_xlim(x[0], x[-1])
+    ax.set_ylim(min(values), max(values))
+    return line,
+
+def getFakeReading(device):
+    """FOR TESTING ONLY - Needs to return same output as getReading"""
+    readTime = datetime.utcnow()
+    fakeReading = '?43^M'+device+'00000'+repr(round(uniform(20,25),1))+'^M'
+    return (readTime, fakeReading)
 
 def main():
     parms = getParms()
@@ -203,61 +254,42 @@ def main():
     if verbose:
         printOpts(parms, devPattern, expDir)
 
+    global readings
+
+    # keep reference to animation obj so not garbage collected
+    ani = FuncAnimation(fig, animate, read('/Users/penny/Documents/iSchool/BrownLab/Scripts/BrownHighPLab/DataAcquisition/Python/DAC/DAC-20170807/DP41-X01_Uncorrected.txt'), interval=int(parms['readInt'])*1200)
+    plt.show()
+
     try :
         while True:
-            (readTime, rawRead) = getReading(parms['url'], parms['devId'])
+            # take the reading
+            (readTime, rawRead) = getReading(parms['url'], parms['devId']) if not testMode else getFakeReading(parms['devId'])
             reading = parseReading(rawRead, devPattern)
+            # log the reading
             logFileName = getLogFileName(expDir, parms['devId'], readTime, parms['lfIncludesDate'])
             logReading(logFileName, readTime, reading)
-            # update plot
+            # plot the reading
+            #readings = updateReadings(parms['lookback'], readings, readTime, reading)
             sleep(parms['readInt'])
-    except:
-        # close plots
-        print 'error'
+    except Exception as e:
+        plt.close(fig)
+        if testMode:
+            raise e
+        else:
+            sys.exit('Some error occurred - try again, perhaps in test mode (-t)')
 
-def getFakeReading(device):
-    """FOR TESTING ONLY - Needs to return same output as getReading"""
-    readTime = datetime.utcnow()
-    fakeReading = '?43^M'+device+'00000'+repr(round(uniform(20,25),1))+'^M'
-    return (readTime, fakeReading)
-
-
-def test():
-    parms = getParms()
-    if 'expId' not in parms:
-        raise ValueError('You must provide an experiment id (-x parameter).')
-    devPattern = getParsePattern(parms['devId'])
-    expDir = mkExperimentDir(parms['logDir'], parms['expId'])
-    if verbose:
-        printOpts(parms, devPattern, expDir)
-
-    readings = []
-    # ani = FuncAnimation(fig, animate, frames=readings, interval=int(parms['readInt']))
-
-
-    #try :
-    while True:
-        # take the reading
-        (readTime, rawRead) = getFakeReading(parms['devId'])
-        reading = parseReading(rawRead, devPattern)
-        # log the reading
-        logFileName = getLogFileName(expDir, parms['devId'], readTime, parms['lfIncludesDate'])
-        logReading(logFileName, readTime, reading)
-        # plot the reading
-        readings = updateReadings(parms['lookback'], readings, (readTime, reading))
-        print readings
-        # plt.show()
-        sleep(parms['readInt'])
-    # except:
-    #     # close plots
-    #     print 'error'
-
+readings = []
 verbose = False
+testMode = False
+logTimeFormat = '%Y-%m-%d %H:%M:%S UTC'
+
+# set up plot, use date format for x-axis, create empty plot
 # fig, ax = plt.subplots()
 # fig.autofmt_xdate()
 # line, = ax.plot([])
+fig, ax = plt.subplots()
+line, = ax.plot([])
 
-test()
 
-# if __name__ == "__main__":
-#     main()
+if __name__ == "__main__":
+    main()

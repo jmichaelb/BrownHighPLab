@@ -9,6 +9,8 @@ from time import sleep
 # used in testing only
 from random import uniform
 
+import matplotlib
+matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 
@@ -207,12 +209,17 @@ def getFakeReading(device):
     fakeReading = '?43^M'+device+'00000'+repr(round(uniform(20,25),1))+'^M'
     return readTime, fakeReading
 
-def plotReadings(readings, fig, ax):
+def plotReadings(readings, line):
     x = [r[0] for r in readings]
     y = [r[1] for r in readings]
-    plt.plot(x, y, 'b')
-    plt.draw()
-    plt.pause(0.00001)
+    line.set_data(x, y)
+    line.axes.relim()
+    line.axes.autoscale_view()
+    line.axes.get_figure().canvas.flush_events()
+    # plt.plot(x, y, 'b')
+    # plt.draw()
+    # plt.pause(0.00001)
+    sleep(.00001)
 
 
 def main():
@@ -226,25 +233,26 @@ def main():
     if verbose:
         printOpts(parms, devPattern, expDir)
 
-
     readings = []
+
     plt.ion()
-    fig, ax,  = plt.subplots(1)
+    fig, ax,  = plt.subplots()
     fig.autofmt_xdate()
     fig.canvas.set_window_title('DP41 Readings')
-    ax.xaxis.set_major_formatter(mdates.DateFormatter(plotTimeFormat))
     ax.set_xlabel('time')
     ax.set_ylabel(parms['yLabel'])
-    plt.show(block=False)
+    ax.xaxis.set_major_formatter(mdates.DateFormatter(plotTimeFormat))
+    line, = ax.plot([],[],'b')
+    fig.show()
 
     try :
         while True:
+            sleep(parms['readInt'])
             readTime, reading = takeReading(parms, devPattern, logFileName)
             # if read failed, just skip the rest of the loop
             if readTime is not None and reading is not None:
                 readings = updateReadings(parms['lookback'], readings, readTime, reading)
-                plotReadings(readings, fig, ax)
-            sleep(parms['readInt'])
+                plotReadings(readings, line)
     except Exception as e:
         plt.close(fig)
         if testMode:

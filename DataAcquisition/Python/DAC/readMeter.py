@@ -10,10 +10,10 @@ from time import sleep
 from random import uniform
 
 import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation
+import matplotlib.dates as mdates
 
 
-def getReading(url, device, timeout_ms=1000):
+def getRawReading(url, device, timeout_ms=1000):
     """Gets a reading from Omega meter equipped with Ethernet card
 
     :param url: the URL (with optional port) of the meter
@@ -22,8 +22,6 @@ def getReading(url, device, timeout_ms=1000):
     :return: returns a 2-tuple containing the (1) time of the reading as a datetime object and
         (2) a string with the raw output from the meter
     """
-    # don't use try block here - the perform WILL ERROR
-    # manually throw an error if nothing is in the buffer
     try:
         c = pycurl.Curl()
         c.setopt(c.URL, url)
@@ -41,7 +39,7 @@ def getReading(url, device, timeout_ms=1000):
         return readTime, rawReading
 
 
-def parseReading(rawReading, extractPattern, targetGroup=0):
+def parseRawReading(rawReading, extractPattern, targetGroup=0):
     """ Parses the raw reading and returns the actual reading as a float
 
     :param rawReading: the meter's raw output from the curl call
@@ -164,84 +162,54 @@ def printOpts(parms, parsePattern, expDir):
     for k in iter(parms.keys()):
         print '\t'+k+': '+repr(parms[k])
 
-
-# def updateReadings(lookbackHrs, readings, newReadTime, newReading):
-#     """Updates an array of readings by adding a new reading and removing readings predating the lookback period
-#
-#     :param lookbackHrs: float detailing the number of hours to keep
-#     :param readings: existing readings
-#     :param newReadTime: datetime of the newReading
-#     :param newReading: the latest reading as float
-#     :return: a new array of readings
-#     """
-#     readings.append((newReadTime,newReading))
-#     hrs = int(lookbackHrs)
-#     mins = int((lookbackHrs - hrs) * 60)
-#     earliestData = datetime.utcnow() - timedelta(hours=hrs, minutes=mins)
-#     return [r for r in readings if r[0] >= earliestData]
-
-# def getReadings(logFileName, lookbackHrs):
-#     """Reads data from the specified log file and add it to the data to be graphed
-#     if it is within the lookbackHrs interval
-#
-#     :param logFileName:
-#     :param lookbackHrs:
-#     :return:
-#     """
-#     hrs = int(lookbackHrs)
-#     lookback = timedelta(hours=hrs, minutes=int((lookbackHrs - hrs)*60))
-#     with open(logFileName,'r') as lf:
-#         data = []
-#         while True:
-#             line = lf.readline()
-#             sleep(.1)
-#             if line:
-#                 (tm,tp) = line.split('\t')
-#                 readTime = datetime.strptime(tm,logTimeFormat)
-#                 if readTime >= (datetime.utcnow() - lookback):
-#                     data.append((readTime, float(tp)))
-#                     yield data
-
-def read(logFile):
-    with open(logFile,'r') as f:
-        data = []
-        while True:
-            line = f.readline()
-            sleep(0.1)
-            if line:
-                (tm,tp) = line.split('\t')
-                readTime = datetime.strptime(tm,logTimeFormat)
-                reading = float(tp)
-                data.append((readTime, reading))
-                yield data
+def getEarliestTimeToPlot(lookbackHrs):
+    hrs = int(lookbackHrs)
+    mins = int((lookbackHrs - hrs) * 60)
+    return datetime.utcnow() - timedelta(hours=hrs, minutes=mins)
 
 
+def updateReadings(lookbackHrs, readings, newReadTime, newReading):
+    """Updates an array of readings by adding a new reading and removing readings predating the lookback period
 
-# def animate(reading):
-#     curve.set_ydata(reading)
-#     #ax.set_xlim(x[0], x[-1])
-#     ax.set_ylim(min(y), max(y))
-#     return curve,
-
-def animate(values):
-    x = [r[0] for r in values]
-    y = [r[1] for r in values]
-    line.set_data(x, y)
-    ax.set_xlim(x[0], x[-1])
-    ax.set_ylim(min(y), max(y))
-    return line,
+    :param lookbackHrs: float detailing the number of hours to keep
+    :param readings: existing readings
+    :param newReadTime: datetime of the newReading
+    :param newReading: the latest reading as float
+    :return: a new array of readings
+    """
+    earliestData = getEarliestTimeToPlot(lookbackHrs)
+    for r in readings:
+        if r[0] <= earliestData:
+            readings.remove(r)
+        else:
+            break   # ok to break after first reading in lookback range
+    # always at least include the latest reading
+    readings.append((newReadTime, newReading))
+    return readings
 
 def takeReading(parms, devPattern, logFileName):
-    readTime, rawRead = getReading(parms['url'], parms['devId']) if not testMode else getFakeReading(parms['devId'])
-    reading = parseReading(rawRead, devPattern)
-    logReading(logFileName, readTime, reading)
-
+    try:
+        readTime, rawRead = getRawReading(parms['url'], parms['devId']) if not testMode else getFakeReading(parms['devId'])
+        reading = parseRawReading(rawRead, devPattern)  # if reading failed, will probably be in this function
+        logReading(logFileName, readTime, reading)
+        return readTime, reading
+    except Exception as e:
+        print 'Failed to read at {0}\n\t{1}'.format(readTime.strftime(errTimeFormat), e)
+        return None, None
 
 def getFakeReading(device):
-    """FOR TESTING ONLY - Needs to return same output as getReading"""
+    """FOR TESTING ONLY - Needs to return same output as getRawReading"""
     readTime = datetime.utcnow()
     fakeReading = '?43^M'+device+'00000'+repr(round(uniform(20,25),1))+'^M'
     return readTime, fakeReading
+
+def plotReadings(readings, fig, ax):
+    x = [r[0] for r in readings]
+    y = [r[1] for r in readings]
+    plt.plot(x, y)
+    plt.draw()
+    plt.pause(0.00001)
+
 
 def main():
     parms = getParms()
@@ -254,21 +222,19 @@ def main():
     if verbose:
         printOpts(parms, devPattern, expDir)
 
-    global readings
 
-    # take a few readings before starting animation
-    # doesn't handle empty file well
-    for i in range(10):
-        takeReading(parms, devPattern, logFileName)
-        sleep(2)
-
-    # keep reference to animation obj so not garbage collected
-    ani = FuncAnimation(fig, animate, read(logFileName), interval=int(parms['readInt'])*1200)
-    plt.show()
+    readings = []
+    plt.ion()
+    fig, ax,  = plt.subplots(1)
+    fig.autofmt_xdate()
+    ax.xaxis.set_major_formatter(mdates.DateFormatter(plotTimeFormat))
+    plt.show(block=False)
 
     try :
         while True:
-            takeReading(parms, devPattern, logFileName)
+            readTime, reading = takeReading(parms, devPattern, logFileName)
+            readings = updateReadings(parms['lookback'], readings, readTime, reading)
+            plotReadings(readings, fig, ax)
             sleep(parms['readInt'])
     except Exception as e:
         plt.close(fig)
@@ -277,17 +243,13 @@ def main():
         else:
             sys.exit('Some error occurred - try again, perhaps in test mode (-t)')
 
-readings = []
+
 verbose = False
 testMode = False
 logTimeFormat = '%Y-%m-%d %H:%M:%S UTC'
+errTimeFormat = '%Y-%m-%d %H:%M'
+plotTimeFormat = '%H:%M:%S'
 
-# set up plot, use date format for x-axis, create empty plot
-fig, ax = plt.subplots()
-fig.autofmt_xdate()
-line, = ax.plot([])
-# fig, ax = plt.subplots()
-# line, = ax.plot([])
 
 
 if __name__ == "__main__":

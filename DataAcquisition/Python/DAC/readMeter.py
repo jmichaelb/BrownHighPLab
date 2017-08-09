@@ -210,7 +210,7 @@ def getFakeReading(device):
 def plotReadings(readings, fig, ax):
     x = [r[0] for r in readings]
     y = [r[1] for r in readings]
-    plt.plot(x, y)
+    plt.plot(x, y, 'b')
     plt.draw()
     plt.pause(0.00001)
 
@@ -231,6 +231,7 @@ def main():
     plt.ion()
     fig, ax,  = plt.subplots(1)
     fig.autofmt_xdate()
+    fig.canvas.set_window_title('DP41 Readings')
     ax.xaxis.set_major_formatter(mdates.DateFormatter(plotTimeFormat))
     ax.set_xlabel('time')
     ax.set_ylabel(parms['yLabel'])
@@ -239,8 +240,10 @@ def main():
     try :
         while True:
             readTime, reading = takeReading(parms, devPattern, logFileName)
-            readings = updateReadings(parms['lookback'], readings, readTime, reading)
-            plotReadings(readings, fig, ax)
+            # if read failed, just skip the rest of the loop
+            if readTime is not None and reading is not None:
+                readings = updateReadings(parms['lookback'], readings, readTime, reading)
+                plotReadings(readings, fig, ax)
             sleep(parms['readInt'])
     except Exception as e:
         plt.close(fig)

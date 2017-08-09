@@ -121,6 +121,7 @@ def getParms(parms=sys.argv[1:]):
             if used, option value integer required
     -l      lookback interval for plotting readings, in hours (default 2)
             float value is acceptable
+    -y      label to use for y-axis on plot (default 'temp (C)')
     -v      verbose output (this will NOT output readings but it will no longer fail silently)
     -t      test mode - does not call the meter but makes up fake readings between 20 and 25
 
@@ -133,8 +134,9 @@ def getParms(parms=sys.argv[1:]):
            'logDir': os.getcwd(),
            'devId': 'X01',
            'readInt': 5,
-           'lookback': 2.0}
-    opts, args = getopt(parms, 'x:p:u:r:i:l:vt')
+           'lookback': 2.0,
+           'yLabel': 'temp (C)'}
+    opts, args = getopt(parms, 'x:p:u:r:i:l:y:vt')
     for opt, arg in opts:
         if opt == '-x':
             out['expId'] = arg
@@ -148,6 +150,8 @@ def getParms(parms=sys.argv[1:]):
             out['readInt'] = int(arg)
         elif opt == '-l':
             out['lookback'] = float(arg)
+        elif opt == '-y':
+            out['yLabel'] = arg
         elif opt == '-v':
             global verbose
             verbose = True
@@ -228,6 +232,8 @@ def main():
     fig, ax,  = plt.subplots(1)
     fig.autofmt_xdate()
     ax.xaxis.set_major_formatter(mdates.DateFormatter(plotTimeFormat))
+    ax.set_xlabel('time')
+    ax.set_ylabel(parms['yLabel'])
     plt.show(block=False)
 
     try :

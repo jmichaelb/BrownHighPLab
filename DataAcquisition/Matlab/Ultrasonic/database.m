@@ -20,10 +20,8 @@
             end
         end
     
-        if ~exist(Omega2filename)
-            interpO2 = [];
-            O2STD = [];
-        end
+        interpO2 = [];
+        O2STD = [];
 
         if ~ exist('check') 
 

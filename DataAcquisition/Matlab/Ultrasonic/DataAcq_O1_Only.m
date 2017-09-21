@@ -25,7 +25,6 @@ filename = num2str(filename);
      end
 
  
-option = input('Manual or automatic peak selection, or view existing plot? (m/a/p) ', 's');
 
 % If the spectra already has a full filename, use the existing filename. If using existing filename, nameswitch = 1 
 x = dir;
@@ -39,26 +38,7 @@ x = dir;
     
      
 
-switch option
 
-     case 'p'
-         
-        % Recalculating sound speed, plotting
-        load(strcat('Processed', filename))
-        UltraSonicStrc=UltraSonicSpeed(UltraSonicStrc,peaks,'y');
-        
-        % Loading data structure
-        filesave = pwd;
-        id = find(filesave == '/');
-        filesave = filesave(id(end)+1:end);
-        load(filesave)
-        
-        % Adding new sound speed and misfit to existing structure
-        data(spectraNum).SoundSpeed = UltraSonicStrc.vel;
-        data(spectraNum).delVel = UltraSonicStrc.del_vel;
-        save(filesave,'data')
-
-otherwise
          
      if ~exist('nameswitch')
         filename = strcat(filename, '.mat');
@@ -281,21 +261,10 @@ end
 
 %% Running Ultrasonic scripts with updated filename
 
-switch option
-  
-    case 'a'
-        
-        UltraSonicStrc=Load_Window_Signal(filename,2,3.5,10.77,'n');
-        UltraSonicStrc=TransferFunction(UltraSonicStrc,1,'TD','a',1);
-        UltraSonicStrc=UltraSonicSpeed(UltraSonicStrc,peaks,'y');
+UltraSonicStrc=Load_Window_Signal(filename,2,3.5,10.77,'n');
+UltraSonicStrc=TransferFunction(UltraSonicStrc,1,'TD','p',1);
+UltraSonicStrc=UltraSonicSpeed(UltraSonicStrc,peaks,'y');
 
-    case 'm'
-        
-        UltraSonicStrc=Load_Window_Signal(filename,2,3.5,10.77,'n');
-        UltraSonicStrc=TransferFunction(UltraSonicStrc,1,'TD','p',1);
-        UltraSonicStrc=UltraSonicSpeed(UltraSonicStrc,peaks,'y');
-
-end
 
 
 %% Plotting Omega 1
@@ -436,14 +405,10 @@ UltraSonicStrc.Omega2STD = [];
 
 savename = UltraSonicStrc.filename;
 save(savename, 'UltraSonicStrc')
-            
-            
-end
+
 
 
 %% Adding data to structure
 
-if option ~= 'p'
 database
-end
 clearvars -except data UltraSonicStrc

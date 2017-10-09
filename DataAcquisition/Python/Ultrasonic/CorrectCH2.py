@@ -31,7 +31,7 @@ ch0 = sorted(ch0, key=lambda t: t[0])
 p2 = os.getcwd()+'/*_CH1_CH2.txt'
 ch2Files = glob(p2)
 for fp in ch2Files:
-    print('Working on file '+fp)
+    print('Working on file '+fp.rsplit('/',1)[1])
     corrFName = fp[0:len(fp)-12]+corrFileTemplate
     # only proceed if a correction file hasn't already been created
     if not os.path.isfile(corrFName):
@@ -46,11 +46,12 @@ for fp in ch2Files:
             if max([(cd[2]-cd[0]).seconds for cd in ch0ch1ch2]) > 2:
                 raise ValueError('At least one temperature lacks a reference in file {0}'.format(fp))
             # calculate correction ch2ConstCorr - aTdT * (ch2ConstCorr - ch0) - zeroCinK
-            ch1ch2Corr = [(getTsOutput(td[2]), str(td[3]), str(td[4]), '%.4f' % (td[5] - aTdT*(td[5]-td[1])-zeroCinK)) for td in ch0ch1ch2]
+            ch1ch2Corr = [(getTsOutput(td[2]), str(td[3]), str(td[4]), '%.6f' % (td[5] - aTdT*(td[5]-td[1])-zeroCinK)) for td in ch0ch1ch2]
             # export file
             with open(corrFName,'w') as f:
                 try:
                     f.writelines('\t'.join(c)+'\n' for c in ch1ch2Corr)
+                    print('Added correction file '+corrFName.rsplit('/', 1)[1])
                 except:
                     os.remove(corrFName)
         else:

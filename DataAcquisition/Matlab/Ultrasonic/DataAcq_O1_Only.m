@@ -50,7 +50,7 @@ load(filename)
 clear dt signal
 
 % Declaring datenum input and output formats
-formatIn = 'mm/dd/yyyy HH:MM:SS PM';
+formatIn = 'mm/dd/yyyy HH:MM PM';
 formatOutdate = 'yyyymmdd';
 formatOuttime = 'HH:MM:SS PM';
 
@@ -63,17 +63,17 @@ filedate = datestr(spectradatetime,formatOutdate);
 % Saving directory of experiment, declaring working folder for log files to
 % be copied into
 expDir = pwd;
-workingDir = '/Users/common/Documents/Experiment /DataAcquisition';
+workingDir = '/Users/penny/Desktop/DataAcquisition';
 
 Omega1filename = strcat(filedate, '_100KPSI.txt');
-Ch2filename = strcat(filedate, '_CH1_CH2.txt');
+Ch2filename = strcat(filedate, '_CH1_CH2_Corr.txt');
 RoomTfilename = strcat(filedate, '_CH3.txt');
 
 
     clear z
 
 % Copy raw spectra files, paste to DataAcquisition folder 
-copyfile(Omega1filename, strcat(workingDir,'/Omega1.txt'))
+copyfile(Omega1filename, strcat(workingDir,'/Omega1.txt')) 
 copyfile(Ch2filename, strcat(workingDir, '/Ch2.txt'))
 copyfile(RoomTfilename, strcat(workingDir, '/RoomT.txt'))
 
@@ -110,7 +110,7 @@ x = Omega1{1};
         end
     end
 % Converting date and time strings to serial date numbers 
-Omega1{1} = datenum(x);
+Omega1{1} = datenum(x); %datenum(datetime(x,'InputFormat','h:mm:ss a M/d/y'));
 
 
 

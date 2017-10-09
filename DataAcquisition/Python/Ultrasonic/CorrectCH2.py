@@ -51,7 +51,7 @@ for fp in ch2Files:
             with open(corrFName,'w') as f:
                 try:
                     f.writelines('\t'.join(c)+'\n' for c in ch1ch2Corr)
-                    print('Added correction file '+corrFName.rsplit('/', 1)[1])
+                    print('\tAdded correction file '+corrFName.rsplit('/', 1)[1])
                 except:
                     os.remove(corrFName)
         else:

@@ -410,5 +410,5 @@ save(savename, 'UltraSonicStrc')
 
 %% Adding data to structure
 
-database
+database_O1_Only
 clearvars -except data UltraSonicStrc

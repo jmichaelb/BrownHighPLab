@@ -63,7 +63,7 @@ filedate = datestr(spectradatetime,formatOutdate);
 % Saving directory of experiment, declaring working folder for log files to
 % be copied into
 expDir = pwd;
-workingDir = '/Users/penny/Desktop/DataAcquisition';
+workingDir = '/Users/common/Documents/Experiment /DataAcquisition';
 
 Omega1filename = strcat(filedate, '_100KPSI.txt');
 Ch2filename = strcat(filedate, '_CH1_CH2_Corr.txt');

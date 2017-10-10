@@ -150,13 +150,13 @@ end
 
 
 
-Omega1{1} = Omega1{1}(Omega1index-5:Omega1index+5);
-Omega1{2} = Omega1{2}(Omega1index-5:Omega1index+5);
-Omega1{3} = Omega1{3}(Omega1index-5:Omega1index+5);
-Ch2{1} = Ch2{1}(Ch2index-5:Ch2index+5);
-Ch2{2} = Ch2{2}(Ch2index-5:Ch2index+5);
-RoomT{1} = RoomT{1}(RoomTindex-5:RoomTindex+5);
-RoomT{2} = RoomT{2}(RoomTindex-5:RoomTindex+5);
+Omega1{1} = Omega1{1}(max(Omega1index-5,1):Omega1index+5);
+Omega1{2} = Omega1{2}(max(Omega1index-5,1):Omega1index+5);
+Omega1{3} = Omega1{3}(max(Omega1index-5,1):Omega1index+5);
+Ch2{1} = Ch2{1}(max(Ch2index-5,1):Ch2index+5);
+Ch2{2} = Ch2{2}(max(Ch2index-5,1):Ch2index+5);
+RoomT{1} = RoomT{1}(max(RoomTindex-5,1):RoomTindex+5);
+RoomT{2} = RoomT{2}(max(RoomTindex-5,1):RoomTindex+5);
 
 Omega1{1} = string(datestr(Omega1{1}, formatOuttime));
 Ch2{1} = string(datestr(Ch2{1}, formatOuttime));

@@ -63,7 +63,7 @@ TF=TF/max(abs(TF));
        scrsz=get(0,'ScreenSize');
        figsz=[1 .8*scrsz(4) 3*scrsz(3)/4 .8*scrsz(4)];
         figure1=figure('Name','Click on Data Peaks','Position',figsz);
-        pks=smartPlot(UltraSonicStrc.t,TF);
+        pks=plotSelect(UltraSonicStrc.t,TF);
         close(figure1)
      case 'e'
         pks=UltraSonicStrc.pks;

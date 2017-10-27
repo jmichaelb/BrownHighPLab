@@ -28,7 +28,8 @@
         if ~ exist('check') 
 
             data = struct('Filename', filename, 'SpectraTime', spectratime, 'Omega1', interpO1, 'Omega2', interpO2, 'Heise1', Heise1, 'Heise2', Heise2,...
-                              'Ch2', interpCh2, 'SoundSpeed', UltraSonicStrc.vel, 'Omega1STD', O1STD, 'Omega2STD', O2STD, 'Ch2STD', Ch2STD, 'delVel', UltraSonicStrc.del_vel, 'RoomT', interpRoomT, 'RoomTSTD', RoomTSTD);
+                              'Ch2', interpCh2, 'SoundSpeed', UltraSonicStrc.vel, 'Omega1STD', O1STD, 'Omega2STD', O2STD, 'Ch2STD', Ch2STD, 'delVel', UltraSonicStrc.del_vel,... 
+                              'RoomT', interpRoomT, 'RoomTSTD', RoomTSTD,'WindowOffset',tMinus,'WindowLength',duration,'SampleLen',sampleLen,'Deconvolution',deconvAlgo,'Damping',damping);
             
             save(filesave,'data')
         else
@@ -54,6 +55,11 @@
             data(spectraNum).delVel = UltraSonicStrc.del_vel;
             data(spectraNum).RoomT = interpRoomT;
             data(spectraNum).RoomTSTD = RoomTSTD;
+            data(spectraNum).WindowOffset = tMinus;
+            data(spectraNum).WindowLength = duration;
+            data(spectraNum).SampleLen= sampleLen;
+            data(spectraNum).Deconvolution = deconvAlgo;
+            data(spectraNum).Damping = damping;
             
             save(filesave, 'data')
 

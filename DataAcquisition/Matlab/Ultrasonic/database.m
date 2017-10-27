@@ -52,8 +52,8 @@
             data(spectraNum).Omega2STD = O2STD;
             data(spectraNum).Ch2STD = Ch2STD;
             data(spectraNum).delVel = UltraSonicStrc.del_vel;
-            data(spectraNum).roomT = interpRoomT;
-            data(spectraNum).roomTSTD = RoomTSTD;
+            data(spectraNum).RoomT = interpRoomT;
+            data(spectraNum).RoomTSTD = RoomTSTD;
             
             save(filesave, 'data')
 

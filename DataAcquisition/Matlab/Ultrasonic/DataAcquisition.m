@@ -2,7 +2,13 @@
 % temperature averages taken from LabView log files, runs the renamed files through the Load_Window_Signal, transferfunction, and ultrasonicspeed
 % functions, and then adds data to a structure
 
+% SS calc parameters
 peaks = [1 2 3 4 ];
+tMinus = 2;
+duration = 3.5;
+sampleLen = 10.77;
+deconvAlgo = 'TD'
+damping = 1;
 
 spectraNum = input('Spectra number? ');
 filename = spectraNum;
@@ -340,20 +346,15 @@ end
 %% Running Ultrasonic scripts with updated filename
 
 switch option
-  
     case 'a'
-        
-        UltraSonicStrc=Load_Window_Signal(filename,2,3.5,10.77,'n');
-        UltraSonicStrc=TransferFunction(UltraSonicStrc,1,'TD','a',1);
-        UltraSonicStrc=UltraSonicSpeed(UltraSonicStrc,peaks,'y');
-
+        peakPick = 'a'
     case 'm'
-        
-        UltraSonicStrc=Load_Window_Signal(filename,2,3.5,10.77,'n');
-        UltraSonicStrc=TransferFunction(UltraSonicStrc,1,'TD','p',1);
-        UltraSonicStrc=UltraSonicSpeed(UltraSonicStrc,peaks,'y');
-
+        peakPick = 'p'
 end
+
+UltraSonicStrc=Load_Window_Signal(filename,tMinus,duration,sampleLen,'n');
+UltraSonicStrc=TransferFunction(UltraSonicStrc,damping,deconvAlgo,peakPick,1);
+UltraSonicStrc=UltraSonicSpeed(UltraSonicStrc,peaks,'y');
 
 
 %% Plotting Omega 1

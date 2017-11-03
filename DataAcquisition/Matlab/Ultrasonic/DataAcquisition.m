@@ -7,7 +7,7 @@ peaks = [1 2 3 4 ];
 tMinus = 2;
 duration = 3.5;
 sampleLen = 10.77;
-deconvAlgo = 'TD'
+deconvAlgo = 'TD';
 damping = 1;
 
 spectraNum = input('Spectra number? ');

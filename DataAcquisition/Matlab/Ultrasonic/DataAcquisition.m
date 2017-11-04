@@ -89,7 +89,7 @@ filedate = datestr(spectradatetime,formatOutdate);
 % Saving directory of experiment, declaring working folder for log files to
 % be copied into
 expDir = pwd;
-workingDir = '/Users/common/Documents/Experiment /DataAcquisition';
+workingDir = '/Users/penny/Desktop/DataAcquisition';
 
 Omega1filename = strcat(filedate, '_100KPSI_OLD.txt');
 Ch2filename = strcat(filedate, '_CH1_CH2.txt');
@@ -347,9 +347,9 @@ end
 
 switch option
     case 'a'
-        peakPick = 'a'
+        peakPick = 'a';
     case 'm'
-        peakPick = 'p'
+        peakPick = 'p';
 end
 
 UltraSonicStrc=Load_Window_Signal(filename,tMinus,duration,sampleLen,'n');

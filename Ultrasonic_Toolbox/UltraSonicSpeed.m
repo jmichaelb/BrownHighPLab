@@ -56,7 +56,7 @@ txt6=['Reflections fit ' txt6];
 txt7=sprintf('Damping=%4.2f Method ',UltraSonicStrc.lambda);
 txt7=[txt7 UltraSonicStrc.flg_decon];
 txt8={'Buffer Rod Reflection'
-'First Sample Refelction'
+'First Sample Reflection'
 'Second Sample Reflection'
 'Third Sample Reflection'
 'Fourth Sample Reflection'
@@ -86,31 +86,22 @@ hold off
 xlabel('Time (microsec)')
 axis([-1 80 -.5 .5])
 
-subplot(212)
-for i=1:npks
-    pp=UltraSonicStrc.pp(i);
-    id=UltraSonicStrc.id{i};
-    tc=t(id(1)):.0001:t(id(end));
-    yc=ppval(pp,tc);
-    if i==1
-    plot(t(id)-fitpk(i),TF(id)/5,'o',tc-fitpk(i),-yc/5,'k-','LineWidth',2)
-    else
-     plot(t(id)-fitpk(i),-TF(id),'o',tc-fitpk(i),-yc,'k-','LineWidth',2)
-    end
-hold on
-end
-plot([0 0],[.5 -.5],'k-','LineWidth',2)
-axis([-.08 .08 -.05 .15])
-hold off
-text(-.075 ,.13,txt2,'FontSize',20)
-text(.025,.13,txt3,'FontSize',20)
-text(.025,.11,txt,'FontSize',20)
-text(-.075 ,.09,txt5,'FontSize',20)
-text(-.075,.11,txt4,'FontSize',20)
-text(.05,.09,txt6,'FontSize',15)
-text(.05,.08,txt7,'FontSize',15)
-xlabel('Time (microsec)')
-hold off
+
+ssStatsL = uicontrol('style','text',...
+    'FontSize',20,...
+    'Units','normalized',...
+    'Position',[.1,.1,.4,.3],...
+    'String',[txt2 newline txt5 newline txt4])
+ssStatsRT = uicontrol('style','text',...
+    'FontSize',20,...
+    'Units','normalized',...
+    'Position',[.5,.25,.4,.15],...
+    'String',[txt3 newline txt])
+ssStatsRB = uicontrol('style','text',...
+    'FontSize',15,...
+    'Units','normalized',...
+    'Position',[.5,.1,.4,.15],...
+    'String',[txt6 newline txt7])
 end
 set(gcf,'PaperType','tabloid')
 

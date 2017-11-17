@@ -41,4 +41,7 @@ Optional parameters are listed below, with the most likely to be used listed fir
 
 # Requested enhancements
 * plot should display latest reading and time
+* time should be plot as local time (UTC can be kept in logfiles)
 * Matlab script to import logs for an experiment.  Should have option for imported time to be in the local time zone
+* Plot should be 2 sub plot, one with total time record for the file and one with just the last 30 minutes.
+* Make a script that incorporate the temperature in a video from a temperature logfile (add temperature reading to every frame from )

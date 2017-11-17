@@ -51,6 +51,12 @@ switch option
          
         % Recalculating sound speed, plotting
         load(strcat('Processed', filename))
+        % if reprocessing data, refit same positional peaks as before
+        % if necessary, you can choose a different set of peaks by 
+        % running the manual option for this acquisition
+        if isfield(UltraSonicStrc,'fitPeaks')
+            peaks = UltraSonicStrc.fitPeaks
+        end
         UltraSonicStrc=UltraSonicSpeed(UltraSonicStrc,peaks,'y');
         
         % Loading data structure

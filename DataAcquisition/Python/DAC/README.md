@@ -32,12 +32,12 @@ Optional parameters are listed below, with the most likely to be used listed fir
 |:---------:|:-------:|:----------- |
 | `-i <int>`| 5       | the read interval in seconds.  value must be an integer |
 | `-l <lkb>`| 2       | the lookback interval for plotting readings, in hours.  The value may be a float. |
-| `-v`      | *off*     | toggles verbose output.  This is limited to echoing the parameters and reporting problems in reading data from the meter (which happens from time to time in the normal course of things.  If specified, verbose output will be provided.  If the parameter is not provided, the script will run silently, although catastrophic failures will still be reported, and the plot will still be created.  Typically, use this parameter if logging is not occurring - it will let you know pretty quickly if no every read attempt is failing. |
-| `-y <lbl>`| 'temp (C)' | the label used on the y-axis on the plot created by this script.  This allows different units of measurement or different quantities to be measured. |  
-| `-p <dir>`| current working directory (as given by `pwd`) | relative path to parent directory for meter logs.  Paths that include spaces may require escaping as well as quotes.  This has not been tested. | 
+| `-v`      | *off*     | toggles verbose output.  This is limited to echoing the parameters and reporting problems in reading data from the meter (which happens from time to time in the normal course of operations).  If this parameter is included, verbose output will be provided.  If the parameter is not provided, the script will run silently, although catastrophic failures will still be reported, and the plot will still be created.  Typically, use this parameter if logging is not occurring - it will let you know pretty quickly if every read attempt is failing. |
+| `-y <lbl>`| 'temp (C)' | the label used on the y-axis on the plot created by this script.  This allows different units of measurement to be used or different quantities to be measured (since the DP41-B supports several different types of sensors). |  
+| `-p <dir>`| current working directory (as given by `pwd`) | relative path to parent directory for meter logs.  Paths that include spaces may require escaping as well as quotes - test this first if you absolutely need to use a path with spaces. | 
 | `-u <url>`| '192.168.1.200:2000' | url from which data will be read.  Do not use unless you have set up a non-default IP address for your meter. | 
 | `-r <cmd>`| 'X01' | read command to send to meter.  Do not use without thorough understanding of commands sent to the meter.  See [the DP41-B-EI manual](https://www.omega.com/manuals/manualpdf/M2549.pdf) for details. |
-| `-t`      | *off* | Turns test mode on.  for use only during development - runs the script without calling the meter and just makes up data to test other parts of the logic. |
+| `-t`      | *off* | toggle that turns test mode on.  for use only during development - runs the script without calling the meter (so testing can be done away from the lab) and just makes up data to test other parts of the script. |
 
 # Requested enhancements
 * plot should display latest reading and time

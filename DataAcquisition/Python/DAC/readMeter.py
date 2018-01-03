@@ -210,9 +210,12 @@ def getFakeReading(device):
     return readTime, fakeReading
 
 def plotReadings(readings, line):
+    # x is date, y is reading
     x = [r[0] for r in readings]
     y = [r[1] for r in readings]
+    lastReading = 'Latest reading: {0} at {1}'.format(y[-1], x[-1].strftime(plotTimeFormat))
     line.set_data(x, y)
+    line.axes.set_title(lastReading)
     line.axes.relim()
     line.axes.autoscale_view()
     line.axes.get_figure().canvas.flush_events()

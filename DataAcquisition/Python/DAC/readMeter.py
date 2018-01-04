@@ -3,8 +3,8 @@
 import pycurl, cStringIO, os, sys
 from re import search
 from getopt import getopt
-from datetime import datetime, timedelta
-from time import sleep
+from datetime import datetime
+from time import time, sleep
 
 # used in testing only
 from random import uniform
@@ -21,7 +21,7 @@ def getRawReading(url, device, timeout_ms=1000):
     :param url: the URL (with optional port) of the meter
     :param device: the device (reading command in the web UI) from which to read
     :param timeout_ms: the max time allowed for each meter read, in ms (default 1000)
-    :return: returns a 2-tuple containing the (1) time of the reading as a datetime object and
+    :return: returns a 2-tuple containing the (1) time of the reading as a timestamp and
         (2) a string with the raw output from the meter
     """
     try:
@@ -32,7 +32,7 @@ def getRawReading(url, device, timeout_ms=1000):
         c.setopt(c.HTTPHEADER, ['Pragma: no-cache'])
         buffer = cStringIO.StringIO()
         c.setopt(c.WRITEDATA, buffer)
-        readTime = datetime.utcnow()
+        readTime = time()
         c.perform()
     finally:
         rawReading = buffer.getvalue()  # timeout throws error - must do this in finally block
@@ -92,10 +92,11 @@ def logReading(logFile, readTime, reading):
     """Appends new reading to a tab-delimited log
 
     :param logFile: full path of the log file (see getLogFileName)
-    :param reading:
-    :return:
+    :param readTime: the timestamp corresponding to the reading
+    :param reading: the parsed reading
     """
-    ll = readTime.strftime(logTimeFormat)+'\t'+repr(reading)+'\n'
+    readTimeUTC = datetime.utcfromtimestamp(readTime)
+    ll = readTimeUTC.strftime(logTimeFormat)+'\t'+repr(reading)+'\n'
     try:
         with open(logFile, 'a') as lf:
             lf.write(ll)
@@ -169,9 +170,8 @@ def printOpts(parms, parsePattern, expDir):
         print '\t'+k+': '+repr(parms[k])
 
 def getEarliestTimeToPlot(lookbackHrs):
-    hrs = int(lookbackHrs)
-    mins = int((lookbackHrs - hrs) * 60)
-    return datetime.utcnow() - timedelta(hours=hrs, minutes=mins)
+    secs = lookbackHrs * 3600
+    return time() - secs
 
 
 def updateReadings(lookbackHrs, readings, newReadTime, newReading):
@@ -179,7 +179,7 @@ def updateReadings(lookbackHrs, readings, newReadTime, newReading):
 
     :param lookbackHrs: float detailing the number of hours to keep
     :param readings: existing readings
-    :param newReadTime: datetime of the newReading
+    :param newReadTime: timestamp of the newReading
     :param newReading: the latest reading as float
     :return: a new array of readings
     """
@@ -200,18 +200,17 @@ def takeReading(parms, devPattern, logFileName):
         logReading(logFileName, readTime, reading)
         return readTime, reading
     except Exception as e:
-        print 'Failed to read at {0}\n\t{1}'.format(readTime.strftime(errTimeFormat), e)
+        print 'Failed to read at {0}\n\t{1}'.format(datetime.fromtimestamp(readTime).strftime(errTimeFormat), e)
         return None, None
 
 def getFakeReading(device):
     """FOR TESTING ONLY - Needs to return same output as getRawReading"""
-    readTime = datetime.utcnow()
     fakeReading = '?43^M'+device+'00000'+repr(round(uniform(20,25),1))+'^M'
-    return readTime, fakeReading
+    return time(), fakeReading
 
 def plotReadings(readings, line):
-    # x is date, y is reading
-    x = [r[0] for r in readings]
+    # x is time, y is reading
+    x = [datetime.fromtimestamp(r[0]) for r in readings]
     y = [r[1] for r in readings]
     lastReading = 'Latest reading: {0} at {1}'.format(y[-1], x[-1].strftime(plotTimeFormat))
     line.set_data(x, y)

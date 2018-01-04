@@ -3,10 +3,10 @@
 `readMeter.py` is designed to poll readings from an Omega DP41-B-EI, but may work with other Omega models as well.
 It is designed to work with Python 2, and has not been tested with Python 3.
 
-Log files will be created in an experiment-specific directory.  Each calendar day (per UTC time) will have a different file in the directory.  
+Log files will be created in an experiment-specific directory.    
 Output are tab-delimited text files with 2 columns: 
 * date and time in UTC with format `yyyy-MM-dd hh:mm:ss z` (this is the Matlab format string)
-* uncorrected temperature
+* uncorrected meter reading
 
 ## Setup
 1. Install Python and [the pycurl library](http://pycurl.io/).
@@ -17,7 +17,7 @@ Output are tab-delimited text files with 2 columns:
 1. To call the script, open Terminal. 
 2. Start the script with the following command in Terminal - values that must be specified by the user are enclosed in <>.  [Parameters](#parameters) are documented below.
     `python <relative path>/readMeter.py -x <expName> <optional parameters>`
-3. A window will open 
+3. A window will open that displays a graph of readings over the specified lookback interval.  Note that time in this graph is in local time of the computer where the script is running, although the log files will be in UTC time. 
 4. To stop the script, hit ⌘-C
 
 ## Parameters
@@ -40,8 +40,6 @@ Optional parameters are listed below, with the most likely to be used listed fir
 | `-t`      | *off* | toggle that turns test mode on.  for use only during development - runs the script without calling the meter (so testing can be done away from the lab) and just makes up data to test other parts of the script. |
 
 # Requested enhancements
-* plot should display latest reading and time
-* time should be plot as local time (UTC can be kept in logfiles)
 * Matlab script to import logs for an experiment.  Should have option for imported time to be in the local time zone
 * Plot should be 2 sub plot, one with total time record for the file and one with just the last 30 minutes.
 * Make a script that incorporate the temperature in a video from a temperature logfile (add temperature reading to every frame from )

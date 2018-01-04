@@ -9,7 +9,7 @@ Output are tab-delimited text files with 2 columns:
 * uncorrected meter reading
 
 ## Setup
-1. Install Python and [the pycurl library](http://pycurl.io/).
+1. Install Python and the [pycurl](http://pycurl.io/) and [matplotlib](https://matplotlib.org/) libraries.
 2. Create or select a directory to store temperature logs for all experiments.  The computer on the DAC side of the lab currently uses `/Users/labimac/Documents/TLog`, but any location is acceptable. 
 3. Copy readMeter.py script to this directory.  
 

@@ -3,8 +3,8 @@
 import pycurl, cStringIO, os, sys
 from re import search
 from getopt import getopt
-from datetime import datetime, timedelta
-from time import sleep
+from datetime import datetime
+from time import time, sleep
 
 # used in testing only
 from random import uniform
@@ -15,24 +15,24 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 
 
-def getRawReading(url, device, timeout_ms=1000):
+def getRawReading(url, cmd, timeout_ms=1000):
     """Gets a reading from Omega meter equipped with Ethernet card
 
     :param url: the URL (with optional port) of the meter
-    :param device: the device (reading command in the web UI) from which to read
+    :param cmd: the read command to send to the meter
     :param timeout_ms: the max time allowed for each meter read, in ms (default 1000)
-    :return: returns a 2-tuple containing the (1) time of the reading as a datetime object and
+    :return: returns a 2-tuple containing the (1) time of the reading as a timestamp and
         (2) a string with the raw output from the meter
     """
     try:
         c = pycurl.Curl()
         c.setopt(c.URL, url)
-        c.setopt(c.POSTFIELDS, '*' + device + '\r')
+        c.setopt(c.POSTFIELDS, '*' + cmd + '\r')
         c.setopt(c.TIMEOUT_MS, timeout_ms)
         c.setopt(c.HTTPHEADER, ['Pragma: no-cache'])
         buffer = cStringIO.StringIO()
         c.setopt(c.WRITEDATA, buffer)
-        readTime = datetime.utcnow()
+        readTime = time()
         c.perform()
     finally:
         rawReading = buffer.getvalue()  # timeout throws error - must do this in finally block
@@ -54,15 +54,15 @@ def parseRawReading(rawReading, extractPattern, targetGroup=0):
     return float(meterRead.group(targetGroup))
 
 
-def getParsePattern(device, pattem='(?<=DEVICE)\d+\.\d+'):
-    """ Turns a regex template into device-specific regex
+def getParsePattern(cmd, pattem='(?<=COMMAND)\d+\.\d+'):
+    """ Turns a regex template into command-specific regex
 
-    :param device: the device from which readings are taken
+    :param cmd: the read command
     :param pattem: the regex pattern template used to extract a reading from the meter output.
-            Must include the string 'DEVICE', which will be replaced with the device parameter
+            Must include the string 'COMMAND', which will be replaced with the cmd parameter
     :return: returns the regex used to extract a reading from the raw meter output
     """
-    return pattem.replace('DEVICE', device)
+    return pattem.replace('COMMAND', cmd)
 
 
 def mkExperimentDir(parentPath, expId):
@@ -77,25 +77,26 @@ def mkExperimentDir(parentPath, expId):
         os.mkdir(expDirStr)
     return expDirStr
 
-def getLogFileName(expDir, device):
+def getLogFileName(expDir, cmd):
     """Returns the target file name for the log data
 
     :param expDir: the path in which data for the current experiment is logged
-    :param device: the identifier for the device being read
+    :param cmd: the read command being used
     :return: the full path, including file name, to which data will be logged
     """
     logFileName = expDir+'/'
-    return logFileName+'DP41-'+device+'_Uncorrected.txt'
+    return logFileName+'DP41-' + cmd + '_Uncorrected.txt'
 
 
 def logReading(logFile, readTime, reading):
     """Appends new reading to a tab-delimited log
 
     :param logFile: full path of the log file (see getLogFileName)
-    :param reading:
-    :return:
+    :param readTime: the timestamp corresponding to the reading
+    :param reading: the parsed reading
     """
-    ll = readTime.strftime(logTimeFormat)+'\t'+repr(reading)+'\n'
+    readTimeUTC = datetime.utcfromtimestamp(readTime)
+    ll = readTimeUTC.strftime(logTimeFormat)+'\t'+repr(reading)+'\n'
     try:
         with open(logFile, 'a') as lf:
             lf.write(ll)
@@ -117,7 +118,7 @@ def getParms(parms=sys.argv[1:]):
     -u      url from which data will be read (default 192.168.1.200:2000)
             if used, option value string required
             protocol not required (only HTTP is supported)
-    -r      device identifier from which data will be read (default X01)
+    -r      read command being used to get data from the device (default X01)
             if used, option value string without spaces required
     -i      the read interval, in seconds (default 5)
             if used, option value integer required
@@ -134,7 +135,7 @@ def getParms(parms=sys.argv[1:]):
     # set up defaults
     out = {'url': '192.168.1.200:2000',
            'logDir': os.getcwd(),
-           'devId': 'X01',
+           'cmd': 'X01',
            'readInt': 5,
            'lookback': 2.0,
            'yLabel': 'temp (C)'}
@@ -147,7 +148,7 @@ def getParms(parms=sys.argv[1:]):
         elif opt == '-u':
             out['url'] = arg
         elif opt == '-r':
-            out['devId'] = arg
+            out['cmd'] = arg
         elif opt == '-i':
             out['readInt'] = int(arg)
         elif opt == '-l':
@@ -169,9 +170,8 @@ def printOpts(parms, parsePattern, expDir):
         print '\t'+k+': '+repr(parms[k])
 
 def getEarliestTimeToPlot(lookbackHrs):
-    hrs = int(lookbackHrs)
-    mins = int((lookbackHrs - hrs) * 60)
-    return datetime.utcnow() - timedelta(hours=hrs, minutes=mins)
+    secs = lookbackHrs * 3600
+    return time() - secs
 
 
 def updateReadings(lookbackHrs, readings, newReadTime, newReading):
@@ -179,7 +179,7 @@ def updateReadings(lookbackHrs, readings, newReadTime, newReading):
 
     :param lookbackHrs: float detailing the number of hours to keep
     :param readings: existing readings
-    :param newReadTime: datetime of the newReading
+    :param newReadTime: timestamp of the newReading
     :param newReading: the latest reading as float
     :return: a new array of readings
     """
@@ -193,26 +193,28 @@ def updateReadings(lookbackHrs, readings, newReadTime, newReading):
     readings.append((newReadTime, newReading))
     return readings
 
-def takeReading(parms, devPattern, logFileName):
+def takeReading(parms, cmdPattern, logFileName):
     try:
-        readTime, rawRead = getRawReading(parms['url'], parms['devId']) if not testMode else getFakeReading(parms['devId'])
-        reading = parseRawReading(rawRead, devPattern)  # if reading failed, will probably be in this function
+        readTime, rawRead = getRawReading(parms['url'], parms['cmd']) if not testMode else getFakeReading(parms['cmd'])
+        reading = parseRawReading(rawRead, cmdPattern)  # if reading failed, will probably be in this function
         logReading(logFileName, readTime, reading)
         return readTime, reading
     except Exception as e:
-        print 'Failed to read at {0}\n\t{1}'.format(readTime.strftime(errTimeFormat), e)
+        print 'Failed to read at {0}\n\t{1}'.format(datetime.fromtimestamp(readTime).strftime(errTimeFormat), e)
         return None, None
 
-def getFakeReading(device):
+def getFakeReading(cmd):
     """FOR TESTING ONLY - Needs to return same output as getRawReading"""
-    readTime = datetime.utcnow()
-    fakeReading = '?43^M'+device+'00000'+repr(round(uniform(20,25),1))+'^M'
-    return readTime, fakeReading
+    fakeReading = '?43^M'+cmd+'00000'+repr(round(uniform(20,25),1))+'^M'
+    return time(), fakeReading
 
 def plotReadings(readings, line):
-    x = [r[0] for r in readings]
+    # x is time, y is reading
+    x = [datetime.fromtimestamp(r[0]) for r in readings]
     y = [r[1] for r in readings]
+    lastReading = 'Latest reading: {0} at {1}'.format(y[-1], x[-1].strftime(plotTimeFormat))
     line.set_data(x, y)
+    line.axes.set_title(lastReading)
     line.axes.relim()
     line.axes.autoscale_view()
     line.axes.get_figure().canvas.flush_events()
@@ -226,12 +228,12 @@ def main():
     parms = getParms()
     if 'expId' not in parms:
         raise ValueError('You must provide an experiment id (-x parameter).')
-    devPattern = getParsePattern(parms['devId'])
+    cmdPattern = getParsePattern(parms['cmd'])
     expDir = mkExperimentDir(parms['logDir'], parms['expId'])
-    logFileName = getLogFileName(expDir, parms['devId'])
+    logFileName = getLogFileName(expDir, parms['cmd'])
 
     if verbose:
-        printOpts(parms, devPattern, expDir)
+        printOpts(parms, cmdPattern, expDir)
 
     readings = []
 
@@ -248,7 +250,7 @@ def main():
     try :
         while True:
             sleep(parms['readInt'])
-            readTime, reading = takeReading(parms, devPattern, logFileName)
+            readTime, reading = takeReading(parms, cmdPattern, logFileName)
             # if read failed, just skip the rest of the loop
             if readTime is not None and reading is not None:
                 readings = updateReadings(parms['lookback'], readings, readTime, reading)

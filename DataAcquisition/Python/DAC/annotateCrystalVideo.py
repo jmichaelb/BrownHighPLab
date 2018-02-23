@@ -1,7 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import os, sys
+import sys
+from getopt import getopt
+from os import path
 from datetime import datetime, timedelta
 import csv
 
@@ -12,7 +14,7 @@ def getParms(parms=sys.argv[1:]):
     """ Processes and parses parameters passed into Python script
 
     Required parameters:
-        -f:     full or relative path to the mp4 file to be annotated
+        -i:     full or relative path to the mp4 file to be annotated
         -l:     full or relative path to the temperature log file (assume single file for now)
 
         Optional parameters:
@@ -25,17 +27,16 @@ def getParms(parms=sys.argv[1:]):
                 value must be an integer
         -k      add this flag to get temperature output in Kelvin
                 otherwise, values will be in °C
-        -v      verbose output (this will NOT output readings but it will no longer fail silently)
-        -t      test mode - does not call the meter but makes up fake readings between 20 and 25
+        -t      test mode - shows annotated video rather than writing it
 
         :param parms: the list of parameters passed to this script.  Defaults to sys.arg[1:]
         :return: a dictionary with output parameters, including defaults
         """
     out = {'useK': False,
            'grace': 10}
-    opts, args = getopt(parms, 'f:l:o:g:kvt')
+    opts, args = getopt(parms, 'i:l:o:g:kt')
     for opt, arg in opts:
-        if opt == '-f':
+        if opt == '-i':
             out['vidIn'] = arg
         elif opt == '-l':
             out['tempLog'] = arg
@@ -45,14 +46,23 @@ def getParms(parms=sys.argv[1:]):
             out['grace'] = int(arg)
         elif opt == '-k':
             out['useK'] = True
-        elif opt == '-v':
-            global verbose
-            verbose = True
         elif opt == '-t':
             global testMode
             testMode = True
             print '!!!!! TEST MODE !!!!!'
+    if not 'vidOut' in out:
+        out['vidOut'] = getOutputFile(out['vidIn'])
     return out
+
+def getOutputFile(vidIn):
+    """Outputs default output file name for annotated video
+    same as original file but with _Annotated appended before extension
+
+    :param vidIn: full or relative path to the input video file
+    :return: full or relative path to the output video file
+    """
+    fPath,fExt = path.splitext(vidIn)
+    return fPath + '_Annotated' + fExt
 
 def getTempIter(tLogName, useK=False):
     """Returns an iterator that will cycle through temperature logs
@@ -103,7 +113,7 @@ def annotateVideo(vidIn, vidOut, tempFile, graceSecs, useK, test):
     # get file creation date in UTC time (since temp logs are in UTC time)
     # TODO: handle UTC or local time
     # TODO: see if there's a better way to get the start date for a video
-    vModDt = datetime.utcfromtimestamp(os.path.getmtime(vidIn))
+    vModDt = datetime.utcfromtimestamp(path.getmtime(vidIn))
     vid = cv2.VideoCapture(vidIn)
     vStartDt = vModDt - timedelta(seconds=vid.get(cv2.CAP_PROP_FRAME_COUNT)/vid.get(cv2.CAP_PROP_FPS))
     frameW = int(vid.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -124,10 +134,10 @@ def annotateVideo(vidIn, vidOut, tempFile, graceSecs, useK, test):
         cv2.destroyWindow(testWin)
         vid.release()
 
-def processFrame(vid, vidStartDt, fw,fh,prevTempDt, prevTemp, currTempDt, currTemp, grace,test):
+def processFrame(vidIn, vidStartDt, fw, fh, prevTempDt, prevTemp, currTempDt, currTemp, grace, test):
     """Processes the next frame of the video
 
-    :param vid: video
+    :param vidIn: video
     :param vidStartDt: the datetime representing the start of the video
     :param fw: width in pixels of frames in this video
     :param fh: height in pixels of frames in this video
@@ -139,8 +149,8 @@ def processFrame(vid, vidStartDt, fw,fh,prevTempDt, prevTemp, currTempDt, currTe
     :return: true if the frame is still within the window of the previous and current temperature logs
             false if the frame could not be read or if the frame is later than the current temp log
     """
-    rv, frame = vid.read()
-    frameDt = vidStartDt + timedelta(milliseconds=vid.get(cv2.CAP_PROP_POS_MSEC))
+    rv, frame = vidIn.read()
+    frameDt = vidStartDt + timedelta(milliseconds=vidIn.get(cv2.CAP_PROP_POS_MSEC))
     # use previous temp if frame is between previous and current temp logs
     if rv and prevTempDt < frameDt and frameDt < currTempDt and frameDt < prevTempDt + grace:
         cont = True # still between previous and current logs - keep reading frames for same temp log
@@ -151,6 +161,9 @@ def processFrame(vid, vidStartDt, fw,fh,prevTempDt, prevTemp, currTempDt, currTe
         # still need to write a temp to the last frame read - check still w/in grace period of current log
         if rv and currTempDt <= frameDt and frameDt <= currTempDt + grace:
             annotateFrame(frame, currTemp, getTempLoc(fw, fh, currTemp), test)
+    # if you got a frame, write to output whether you annotated or not
+    if rv:
+        writeFrame(vidOut,frame) if not test else showFrame(frame)
     return cont
 
 def getTempLoc(frameWidth, frameHeight, tempStr):
@@ -164,7 +177,6 @@ def getTempLoc(frameWidth, frameHeight, tempStr):
     (w,h),_ = cv2.getTextSize(tempStr, font, fScale, fThickness)
     return (frameWidth - w - 10,frameHeight - h) # pad the width a bit so the last character doesn't look chopped off
 
-
 def annotateFrame(frame, tempStr, tempLoc, test):
     """Annotates a single frame of a video - temp in lower right corner of the frame
 
@@ -174,18 +186,23 @@ def annotateFrame(frame, tempStr, tempLoc, test):
     :param test: true to run in test mode and show images as they are amended
     """
     cv2.putText(frame, tempStr, tempLoc, font, fScale, blue, fThickness)
-    if test:
-        cv2.imshow(testWin, frame)
-        cv2.waitKey(10)
-
-# def main():
-#     parms = getParms()
 
 
+def writeFrame(vidOut, frame):
+    pass
+
+def showFrame(frame):
+    cv2.imshow(testWin, frame)
+    cv2.waitKey(10)
+
+
+def main():
+    parms = getParms()
+    # TODO: figure out a way to stop immediately for a file that is already annotated
+    annotateVideo(parms['vidIn'],parms['vidOut'],parms['tempLog'],parms['grace'],parms['useK'],testMode)
 
 
 
-verbose = False
 testMode = False
 logTimeFormat = '%Y-%m-%d %H:%M:%S %Z'
 C2K = 273.15
@@ -195,6 +212,6 @@ fScale = 2
 fThickness = 3
 testWin = 'annotation test'
 
-# if __name__ == '__main__':
-#     main()
+if __name__ == '__main__':
+    main()
 

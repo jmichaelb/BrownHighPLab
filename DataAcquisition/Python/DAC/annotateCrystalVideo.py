@@ -10,6 +10,7 @@ import csv
 import numpy
 import cv2
 
+
 def getParms(parms=sys.argv[1:]):
     """ Processes and parses parameters passed into Python script
 
@@ -27,6 +28,7 @@ def getParms(parms=sys.argv[1:]):
                 value must be an integer
         -k      add this flag to get temperature output in Kelvin
                 otherwise, values will be in °C
+        -v      verbose output
         -t      test mode - shows annotated video rather than writing it
 
         :param parms: the list of parameters passed to this script.  Defaults to sys.arg[1:]
@@ -34,7 +36,7 @@ def getParms(parms=sys.argv[1:]):
         """
     out = {'useK': False,
            'grace': 10}
-    opts, args = getopt(parms, 'i:l:o:g:kt')
+    opts, args = getopt(parms, 'i:l:o:g:kvt')
     for opt, arg in opts:
         if opt == '-i':
             out['vidIn'] = arg
@@ -46,6 +48,9 @@ def getParms(parms=sys.argv[1:]):
             out['grace'] = int(arg)
         elif opt == '-k':
             out['useK'] = True
+        elif opt == '-v':
+            global verbose
+            verbose = True
         elif opt == '-t':
             global testMode
             testMode = True
@@ -53,6 +58,7 @@ def getParms(parms=sys.argv[1:]):
     if not 'vidOut' in out:
         out['vidOut'] = getOutputFile(out['vidIn'])
     return out
+
 
 def getOutputFile(vidIn):
     """Outputs default output file name for annotated video
@@ -63,6 +69,7 @@ def getOutputFile(vidIn):
     """
     fPath,fExt = path.splitext(vidIn)
     return fPath + '_Annotated' + fExt
+
 
 def getTempIter(tLogName, useK=False):
     """Returns an iterator that will cycle through temperature logs
@@ -79,6 +86,7 @@ def getTempIter(tLogName, useK=False):
         for r in tRdr:
             yield parseLogLine(r,useK)
 
+
 def parseLogLine(ll, useK=False):
     """Parses a line of text from the temperature log
     Splits tab-delimited datetime and temp into a tuple
@@ -92,7 +100,7 @@ def parseLogLine(ll, useK=False):
     if useK:
         t += C2K
     t = str(t) + (' K' if useK else ' C') # degree symbol not supported by library rendering image
-    ts = datetime.strptime(ll[0],logTimeFormat)
+    ts = datetime.strptime(ll[0], logTimeFmt)
     return (ts,t)
 
 
@@ -108,14 +116,17 @@ def annotateVideo(vidIn, vidOut, tempFile, graceSecs, useK, test):
                         and the time of a frame in the video
     :param test: a boolean indicating whether to run in test mode (displays video)
     """
-
     grace = timedelta(seconds=graceSecs)
     # get file creation date in UTC time (since temp logs are in UTC time)
     # TODO: handle UTC or local time
     # TODO: see if there's a better way to get the start date for a video
-    vModDt = datetime.utcfromtimestamp(path.getmtime(vidIn))
+    vModDt = datetime.utcfromtimestamp(path.getmtime(vidIn)) # assuming this is date of end of file
     vid = cv2.VideoCapture(vidIn)
-    vStartDt = vModDt - timedelta(seconds=vid.get(cv2.CAP_PROP_FRAME_COUNT)/vid.get(cv2.CAP_PROP_FPS))
+    vDuration = timedelta(seconds=vid.get(cv2.CAP_PROP_FRAME_COUNT)/vid.get(cv2.CAP_PROP_FPS))
+    vStartDt = vModDt - vDuration
+    if verbose:
+        len = vModDt - vStartDt
+        print 'File starts at '+str(vStartDt)+', ends at '+str(vModDt)+' ('+str(int(len.total_seconds()/6.0)/10.0)+' mins long)'
     frameW = int(vid.get(cv2.CAP_PROP_FRAME_WIDTH))
     frameH = int(vid.get(cv2.CAP_PROP_FRAME_HEIGHT))
     if test:
@@ -124,7 +135,10 @@ def annotateVideo(vidIn, vidOut, tempFile, graceSecs, useK, test):
     # TODO: make this robust enough to ditch the assumption that the temp log starts before and ends after the video file
     try:
         for nt in getTempIter(tempFile, useK):
-            if nt[0] >= vStartDt and nt[0] <= vModDt+grace:   # only pay attention to temp logs within the range of time of the video
+            # only pay attention to temp logs within the range of time of the video
+            # once nt is in range of video, lt will still be available for first few frames
+            # at end, include grace period in end so that nt will be properly processed as lt on a few extra loops
+            if nt[0] >= vStartDt and nt[0] <= vModDt+grace:
                 cont = True
                 # process all frames between lt and nt
                 while cont:
@@ -133,6 +147,7 @@ def annotateVideo(vidIn, vidOut, tempFile, graceSecs, useK, test):
     finally:
         cv2.destroyWindow(testWin)
         vid.release()
+
 
 def processFrame(vidIn, vidStartDt, fw, fh, prevTempDt, prevTemp, currTempDt, currTemp, grace, test):
     """Processes the next frame of the video
@@ -152,44 +167,66 @@ def processFrame(vidIn, vidStartDt, fw, fh, prevTempDt, prevTemp, currTempDt, cu
     rv, frame = vidIn.read()
     frameDt = vidStartDt + timedelta(milliseconds=vidIn.get(cv2.CAP_PROP_POS_MSEC))
     # use previous temp if frame is between previous and current temp logs
-    if rv and prevTempDt < frameDt and frameDt < currTempDt and frameDt < prevTempDt + grace:
+    if rv and prevTempDt < frameDt and frameDt < currTempDt:
         cont = True # still between previous and current logs - keep reading frames for same temp log
-        annotateFrame(frame, prevTemp, getTempLoc(fw, fh, prevTemp), test)
+        annotateFrame(frame, frameDt, prevTemp, fw, fh) if frameDt < prevTempDt+grace else warnMissingTemp(prevTempDt,currTempDt,frameDt)
     else:  # once you advance to a frame later than nt (or run out of frames), stop advancing
-        cont = False    # TODO: better handle running out of frames
-        # TODO: plug this hole that may result in unannotated frames
+        cont = False;
         # still need to write a temp to the last frame read - check still w/in grace period of current log
         if rv and currTempDt <= frameDt and frameDt <= currTempDt + grace:
-            annotateFrame(frame, currTemp, getTempLoc(fw, fh, currTemp), test)
+            annotateFrame(frame, frameDt, currTemp, fw, fh)
     # if you got a frame, write to output whether you annotated or not
     if rv:
         writeFrame(vidOut,frame) if not test else showFrame(frame)
     return cont
 
-def getTempLoc(frameWidth, frameHeight, tempStr):
+
+def warnMissingTemp(prevTempDt, currTempDt, frameDt):
+    if verbose:
+        print 'Frame at '+frameDt.strftime(warnFmt)+' not annotated'
+        print '\tprevious log at '+prevTempDt.strftime(warnFmt)
+        print '\tcurrent log at '+currTempDt.strftime(warnFmt)
+
+
+def getAnnotationLoc(fw, fh, ar, ab, annotation, aScale, aThickness):
     """Calculates the location for temp string given a frame size and temperature string
+    Places annotations at the bottom right of the adjusted frame size
 
-    :param frameWidth: int giving width of frame in pixels
-    :param frameHeight: int giving height of frame in pixels
-    :param tempStr: string with temperature and unit
-    :return: tuple with the location for the text in a frame
+    :param fw: width  of frame in pixels
+    :param fh: height of frame in pixels
+    :param ar: the total width of any annotations to the right of this one, in pixels
+    :param ab: the total height of any annotations below this one, in pixels
+    :param annotation: string with annotation to be added
+    :param aScale: scale of the annotation text
+    :param aThickness: thickness of the annotation text
+    :return: tuple with the location for the text in a frame plus the width and height of the text
     """
-    (w,h),_ = cv2.getTextSize(tempStr, font, fScale, fThickness)
-    return (frameWidth - w - 10,frameHeight - h) # pad the width a bit so the last character doesn't look chopped off
+    (w,h),_ = cv2.getTextSize(annotation, font, aScale, aThickness)
+    # pad the width a bit so the last character doesn't look chopped off
+    return (fw - ar - w - 10, fh - ab - h), w, h
 
-def annotateFrame(frame, tempStr, tempLoc, test):
+
+def annotateFrame(frame, frameDt, tempStr, fw, fh):
     """Annotates a single frame of a video - temp in lower right corner of the frame
 
     :param frame: the frame object to be annotated
+    :param frameDt: the calculated date of the frame
     :param tempStr: the string to add to the frame
-    :param tempLoc: the pixel location of the lower left corner of the text
-    :param test: true to run in test mode and show images as they are amended
+    :param fw: width in pixels of frames in this video
+    :param fh: height in pixels of frames in this video
     """
-    cv2.putText(frame, tempStr, tempLoc, font, fScale, blue, fThickness)
+    # add date string at very bottom
+    dStr = frameDt.strftime(annotateFmt)
+    dloc,_,dh = getAnnotationLoc(fw,fh,0,0,dStr,dfScale,dfThickness)
+    cv2.putText(frame,dStr,dloc,font,dfScale,blue,dfThickness)
+    # add temp string just above the date
+    tloc,_,_ = getAnnotationLoc(fw,fh,0,dh,tempStr,tfScale,tfThickness)
+    cv2.putText(frame, tempStr, tloc, font, tfScale, blue, tfThickness)
 
 
 def writeFrame(vidOut, frame):
     pass
+
 
 def showFrame(frame):
     cv2.imshow(testWin, frame)
@@ -202,15 +239,20 @@ def main():
     annotateVideo(parms['vidIn'],parms['vidOut'],parms['tempLog'],parms['grace'],parms['useK'],testMode)
 
 
-
+verbose = False
 testMode = False
-logTimeFormat = '%Y-%m-%d %H:%M:%S %Z'
+logTimeFmt = '%Y-%m-%d %H:%M:%S %Z'
+annotateFmt = '%-d %b %H:%M:%S UTC'
+warnFmt = '%Y-%m-%d %H:%M:%S'
 C2K = 273.15
 blue = (255,0,0)
 font = cv2.FONT_HERSHEY_SIMPLEX
-fScale = 2
-fThickness = 3
+tfScale = 2
+tfThickness = 3
+dfScale=.5
+dfThickness=2
 testWin = 'annotation test'
+
 
 if __name__ == '__main__':
     main()

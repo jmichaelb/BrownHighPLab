@@ -119,16 +119,18 @@ def annotateVideo(vidIn, vidOut, tempFile, graceSecs, useK, test):
     grace = timedelta(seconds=graceSecs)
     # get file creation date in UTC time (since temp logs are in UTC time)
     # TODO: handle UTC or local time
-    # TODO: see if there's a better way to get the start date for a video
+    # TODO: see if there's a better way to get the start date for a video - prob need to have user input it
     vModDt = datetime.utcfromtimestamp(path.getmtime(vidIn)) # assuming this is date of end of file
-    vid = cv2.VideoCapture(vidIn)
-    vDuration = timedelta(seconds=vid.get(cv2.CAP_PROP_FRAME_COUNT)/vid.get(cv2.CAP_PROP_FPS))
+    vidIn = cv2.VideoCapture(vidIn)
+    fps = vidIn.get(cv2.CAP_PROP_FPS)
+    frameW = int(vidIn.get(cv2.CAP_PROP_FRAME_WIDTH))
+    frameH = int(vidIn.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    vDuration = timedelta(seconds=vidIn.get(cv2.CAP_PROP_FRAME_COUNT)/fps)
     vStartDt = vModDt - vDuration
+    vidOut = cv2.VideoWriter(vidOut,cv2.CAP_FFMPEG,cv2.VideoWriter_fourcc(*'mp4v'),fps,(frameW,frameH),isColor=1)
     if verbose:
         len = vModDt - vStartDt
         print 'File starts at '+str(vStartDt)+', ends at '+str(vModDt)+' ('+str(int(len.total_seconds()/6.0)/10.0)+' mins long)'
-    frameW = int(vid.get(cv2.CAP_PROP_FRAME_WIDTH))
-    frameH = int(vid.get(cv2.CAP_PROP_FRAME_HEIGHT))
     if test:
         cv2.namedWindow(testWin, cv2.WINDOW_NORMAL)
         cv2.resizeWindow(testWin,frameW,frameH)
@@ -142,18 +144,21 @@ def annotateVideo(vidIn, vidOut, tempFile, graceSecs, useK, test):
                 cont = True
                 # process all frames between lt and nt
                 while cont:
-                    cont = processFrame(vid,vStartDt,frameW,frameH,lt[0],lt[1],nt[0],nt[1],grace,test)
+                    cont = processFrame(vidIn,vStartDt,vidOut,frameW,frameH,lt[0],lt[1],nt[0],nt[1],grace,test)
             lt = nt
     finally:
-        cv2.destroyWindow(testWin)
-        vid.release()
+        if test:
+            cv2.destroyWindow(testWin)
+        vidIn.release()
+        vidOut.release()
 
 
-def processFrame(vidIn, vidStartDt, fw, fh, prevTempDt, prevTemp, currTempDt, currTemp, grace, test):
+def processFrame(vidIn, vidStartDt, vidOut, fw, fh, prevTempDt, prevTemp, currTempDt, currTemp, grace, test):
     """Processes the next frame of the video
 
-    :param vidIn: video
+    :param vidIn: VideoCapture object representing the original unannotated video
     :param vidStartDt: the datetime representing the start of the video
+    :param vidOut: VideoWriter object representing the file to which frames should be written
     :param fw: width in pixels of frames in this video
     :param fh: height in pixels of frames in this video
     :param prevTempDt: the datetime for the previous temperature log
@@ -225,10 +230,20 @@ def annotateFrame(frame, frameDt, tempStr, fw, fh):
 
 
 def writeFrame(vidOut, frame):
-    pass
+    """Writes a frame to the specified video file
+
+    :param vidOut: a VideoWriter object representing the output file
+    :param frame: the annotated frame to write
+    """
+    vidOut.write(frame)
 
 
 def showFrame(frame):
+    """Displays the annotated frame in the test window
+    Waits 10 ms before returning (this will display annotated video at ~3x speed)
+
+    :param frame: the frame to display
+    """
     cv2.imshow(testWin, frame)
     cv2.waitKey(10)
 

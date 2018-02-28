@@ -26,6 +26,8 @@ def getParms(parms=sys.argv[1:]):
                 as the last available temperature, in seconds
                 defaults to 10 (double the default read interval in readMeter.py)
                 value must be an integer
+        -d      add this flag to include date and time in the annotation
+                otherwise only temperature will be included
         -k      add this flag to get temperature output in Kelvin
                 otherwise, values will be in °C
         -v      verbose output
@@ -35,8 +37,9 @@ def getParms(parms=sys.argv[1:]):
         :return: a dictionary with output parameters, including defaults
         """
     out = {'useK': False,
+           'includeDt': False,
            'grace': 10}
-    opts, args = getopt(parms, 'i:l:o:g:kvt')
+    opts, args = getopt(parms, 'i:l:o:g:dkvt')
     for opt, arg in opts:
         if opt == '-i':
             out['vidIn'] = arg
@@ -46,6 +49,8 @@ def getParms(parms=sys.argv[1:]):
             out['vidOut'] = arg
         elif opt == '-g':
             out['grace'] = int(arg)
+        elif opt == '-d':
+            out['includeDt'] = True
         elif opt == '-k':
             out['useK'] = True
         elif opt == '-v':
@@ -71,12 +76,12 @@ def getOutputFile(vidIn):
     return fPath + '_Annotated' + fExt
 
 
-def getTempIter(tLogName, useK=False):
+def getTempIter(tLogName, useK):
     """Returns an iterator that will cycle through temperature logs
     Assumes single log file already ordered by date/time
     with each log entry on a new line, temperatures in Celsius
 
-    :param tlog: the path to the temperature log file
+    :param tlogName: the path to the temperature log file
     :param useK: true to report temperatures in K rather than in C
     :return: a generator that gives temperatures
     """
@@ -87,7 +92,7 @@ def getTempIter(tLogName, useK=False):
             yield parseLogLine(r,useK)
 
 
-def parseLogLine(ll, useK=False):
+def parseLogLine(ll, useK):
     """Parses a line of text from the temperature log
     Splits tab-delimited datetime and temp into a tuple
 
@@ -104,17 +109,19 @@ def parseLogLine(ll, useK=False):
     return (ts,t)
 
 
-def annotateVideo(vidIn, vidOut, tempFile, graceSecs, useK, test):
-    """Opens a video file, goes throught it frame by frame,
+def annotateVideo(vidIn, vidOut, tempFile, graceSecs, useK, includeDt):
+    """Opens a video file, goes through it frame by frame,
     adds a temperature to it if one is available, and writes
     frames to a new video file
 
     :param vidIn: name of the input video file
     :param vidOut: name of the output video file
-    :param tempIter: a generator that goes through temperatures in a log file (output from getTempIter)
-    :param graceSecs: float indicatings seconds that may elapse between a logged temp
+    :param tempFile: full or relative path to the relevant temperature log
+                    WARNING: script assumes temp log begins before and ends after the time frame of the video.
+    :param graceSecs: float indicating seconds that may elapse between a logged temp
                         and the time of a frame in the video
-    :param test: a boolean indicating whether to run in test mode (displays video)
+    :param useK: a boolean indicating whether to report temperature in K rather than degrees C
+    :param includeDt: a boolean indicating whether to include the frame's date/time in the annotation
     """
     grace = timedelta(seconds=graceSecs)
     # get file creation date in UTC time (since temp logs are in UTC time)
@@ -127,11 +134,13 @@ def annotateVideo(vidIn, vidOut, tempFile, graceSecs, useK, test):
     frameH = int(vidIn.get(cv2.CAP_PROP_FRAME_HEIGHT))
     vDuration = timedelta(seconds=vidIn.get(cv2.CAP_PROP_FRAME_COUNT)/fps)
     vStartDt = vModDt - vDuration
-    vidOut = cv2.VideoWriter(vidOut,cv2.CAP_FFMPEG,cv2.VideoWriter_fourcc(*'mp4v'),fps,(frameW,frameH),isColor=1)
+    # TODO: figure out why resulting file is so much bigger than original file
+    # already confirmed that the codec is the same as the original file
+    vidOut = cv2.VideoWriter(vidOut,cv2.CAP_FFMPEG,int(vidIn.get(cv2.CAP_PROP_FOURCC)),fps,(frameW,frameH),isColor=1)
     if verbose:
         len = vModDt - vStartDt
         print 'File starts at '+str(vStartDt)+', ends at '+str(vModDt)+' ('+str(int(len.total_seconds()/6.0)/10.0)+' mins long)'
-    if test:
+    if testMode:
         cv2.namedWindow(testWin, cv2.WINDOW_NORMAL)
         cv2.resizeWindow(testWin,frameW,frameH)
     # TODO: make this robust enough to ditch the assumption that the temp log starts before and ends after the video file
@@ -144,16 +153,17 @@ def annotateVideo(vidIn, vidOut, tempFile, graceSecs, useK, test):
                 cont = True
                 # process all frames between lt and nt
                 while cont:
-                    cont = processFrame(vidIn,vStartDt,vidOut,frameW,frameH,lt[0],lt[1],nt[0],nt[1],grace,test)
+                    cont = processFrame(vidIn,vStartDt,vidOut,frameW,frameH,lt[0],lt[1],nt[0],nt[1],grace,includeDt)
+                    # TODO: Add progress messages with cv2.CAP_PROP_POS_AVI_RATIO
             lt = nt
     finally:
-        if test:
+        if testMode:
             cv2.destroyWindow(testWin)
         vidIn.release()
         vidOut.release()
 
 
-def processFrame(vidIn, vidStartDt, vidOut, fw, fh, prevTempDt, prevTemp, currTempDt, currTemp, grace, test):
+def processFrame(vidIn, vidStartDt, vidOut, fw, fh, prevTempDt, prevTemp, currTempDt, currTemp, grace, includeDt):
     """Processes the next frame of the video
 
     :param vidIn: VideoCapture object representing the original unannotated video
@@ -166,6 +176,7 @@ def processFrame(vidIn, vidStartDt, vidOut, fw, fh, prevTempDt, prevTemp, currTe
     :param currTempDt: the datetime for the current temperature log
     :param currTemp: the temperature string for the current temperature log
     :param grace: a timedelta object indicating the grace period for a temperature reading
+    :param includeDt: a Boolean indicating whether the annotation should include the datetime of the frame or not
     :return: true if the frame is still within the window of the previous and current temperature logs
             false if the frame could not be read or if the frame is later than the current temp log
     """
@@ -174,15 +185,18 @@ def processFrame(vidIn, vidStartDt, vidOut, fw, fh, prevTempDt, prevTemp, currTe
     # use previous temp if frame is between previous and current temp logs
     if rv and prevTempDt < frameDt and frameDt < currTempDt:
         cont = True # still between previous and current logs - keep reading frames for same temp log
-        annotateFrame(frame, frameDt, prevTemp, fw, fh) if frameDt < prevTempDt+grace else warnMissingTemp(prevTempDt,currTempDt,frameDt)
+        if frameDt < prevTempDt+grace:
+            annotateFrame(frame, frameDt, prevTemp, fw, fh, includeDt)
+        else:
+            warnMissingTemp(prevTempDt,currTempDt,frameDt)
     else:  # once you advance to a frame later than nt (or run out of frames), stop advancing
         cont = False;
         # still need to write a temp to the last frame read - check still w/in grace period of current log
         if rv and currTempDt <= frameDt and frameDt <= currTempDt + grace:
-            annotateFrame(frame, frameDt, currTemp, fw, fh)
+            annotateFrame(frame, frameDt, currTemp, fw, fh, includeDt)
     # if you got a frame, write to output whether you annotated or not
     if rv:
-        writeFrame(vidOut,frame) if not test else showFrame(frame)
+        writeFrame(vidOut,frame) if not testMode else showFrame(frame)
     return cont
 
 
@@ -211,7 +225,7 @@ def getAnnotationLoc(fw, fh, ar, ab, annotation, aScale, aThickness):
     return (fw - ar - w - 10, fh - ab - h), w, h
 
 
-def annotateFrame(frame, frameDt, tempStr, fw, fh):
+def annotateFrame(frame, frameDt, tempStr, fw, fh, includeDt):
     """Annotates a single frame of a video - temp in lower right corner of the frame
 
     :param frame: the frame object to be annotated
@@ -219,12 +233,16 @@ def annotateFrame(frame, frameDt, tempStr, fw, fh):
     :param tempStr: the string to add to the frame
     :param fw: width in pixels of frames in this video
     :param fh: height in pixels of frames in this video
+    :param includeDt: a Boolean indicating whether to include the datetime as part of the annotation
     """
-    # add date string at very bottom
-    dStr = frameDt.strftime(annotateFmt)
-    dloc,_,dh = getAnnotationLoc(fw,fh,0,0,dStr,dfScale,dfThickness)
-    cv2.putText(frame,dStr,dloc,font,dfScale,blue,dfThickness)
-    # add temp string just above the date
+    # if including it, add date string at very bottom
+    if includeDt:
+        dStr = frameDt.strftime(annotateFmt)
+        dloc,_,dh = getAnnotationLoc(fw,fh,0,0,dStr,dfScale,dfThickness)
+        cv2.putText(frame,dStr,dloc,font,dfScale,blue,dfThickness)
+    else:
+        dh = 0
+    # add temp string just above the date, if included
     tloc,_,_ = getAnnotationLoc(fw,fh,0,dh,tempStr,tfScale,tfThickness)
     cv2.putText(frame, tempStr, tloc, font, tfScale, blue, tfThickness)
 
@@ -251,7 +269,7 @@ def showFrame(frame):
 def main():
     parms = getParms()
     # TODO: figure out a way to stop immediately for a file that is already annotated
-    annotateVideo(parms['vidIn'],parms['vidOut'],parms['tempLog'],parms['grace'],parms['useK'],testMode)
+    annotateVideo(parms['vidIn'],parms['vidOut'],parms['tempLog'],parms['grace'],parms['useK'],parms['includeDt'])
 
 
 verbose = False

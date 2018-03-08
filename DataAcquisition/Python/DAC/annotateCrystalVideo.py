@@ -104,9 +104,9 @@ def parseLogLine(ll, useK):
     t = float(ll[1])
     if useK:
         t += C2K
-    t = str(t) + (' K' if useK else ' C') # degree symbol not supported by library rendering image
+    fStr = '{:.1f} '+ ('K' if useK else 'C') # degree symbol not supported by library rendering image
     ts = datetime.strptime(ll[0], logTimeFmt)
-    return (ts,t)
+    return (ts,fStr.format(t))
 
 
 def annotateVideo(vidIn, vidOut, tempFile, graceSecs, useK, includeDt):

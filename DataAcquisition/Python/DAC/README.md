@@ -68,6 +68,7 @@ Optional parameters are listed below, with the most likely to be used listed fir
 |:---------:|:-------:|:----------- |
 | `-o` <path> | same path as `-i` but with _Annotated appended to file name before its extension | full or relative path to the annotated video file |
 | `-g` <int> | 10 | grace period beyond which temperature is assumed to be the same as the last available temperature, in seconds |
+| `-m` <str> | 'n/a' | string to use for annotation if T is missing (usually because grace period is exceeded between two temperature logs |
 | `-d` | *T only* | add this flag to include date and time in the annotation along with the temperature |
 | `-k` | *°C* | add this flag to get temperature output in Kelvin |
 | `-v` | *off* | verbose mode |

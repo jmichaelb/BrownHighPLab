@@ -26,6 +26,8 @@ def getParms(parms=sys.argv[1:]):
                 as the last available temperature, in seconds
                 defaults to 10 (double the default read interval in readMeter.py)
                 value must be an integer
+        -m      string to use for annotation when temperature is missing
+                defaults to 'n/a'
         -d      add this flag to include date and time in the annotation
                 otherwise only temperature will be included
         -k      add this flag to get temperature output in Kelvin
@@ -38,8 +40,9 @@ def getParms(parms=sys.argv[1:]):
         """
     out = {'useK': False,
            'includeDt': False,
-           'grace': 10}
-    opts, args = getopt(parms, 'i:l:o:g:dkvt')
+           'grace': 10,
+           'missingT': 'n/a'}
+    opts, args = getopt(parms, 'i:l:o:g:m:dkvt')
     for opt, arg in opts:
         if opt == '-i':
             out['vidIn'] = arg
@@ -49,6 +52,8 @@ def getParms(parms=sys.argv[1:]):
             out['vidOut'] = arg
         elif opt == '-g':
             out['grace'] = int(arg)
+        elif opt == '-m':
+            out['missingT'] = arg
         elif opt == '-d':
             out['includeDt'] = True
         elif opt == '-k':
@@ -109,7 +114,7 @@ def parseLogLine(ll, useK):
     return (ts,fStr.format(t))
 
 
-def annotateVideo(vidIn, vidOut, tempFile, graceSecs, useK, includeDt):
+def annotateVideo(vidIn, vidOut, tempFile, graceSecs, useK, includeDt, missingTMsg):
     """Opens a video file, goes through it frame by frame,
     adds a temperature to it if one is available, and writes
     frames to a new video file
@@ -122,6 +127,7 @@ def annotateVideo(vidIn, vidOut, tempFile, graceSecs, useK, includeDt):
                         and the time of a frame in the video
     :param useK: a boolean indicating whether to report temperature in K rather than degrees C
     :param includeDt: a boolean indicating whether to include the frame's date/time in the annotation
+    :param missingTMsg: a string with the message to display if no temperature is available
     """
     grace = timedelta(seconds=graceSecs)
     # get file creation date in UTC time (since temp logs are in UTC time)
@@ -153,7 +159,7 @@ def annotateVideo(vidIn, vidOut, tempFile, graceSecs, useK, includeDt):
                 cont = True
                 # process all frames between lt and nt
                 while cont:
-                    cont = processFrame(vidIn,vStartDt,vidOut,frameW,frameH,lt[0],lt[1],nt[0],nt[1],grace,includeDt)
+                    cont = processFrame(vidIn,vStartDt,vidOut,frameW,frameH,lt[0],lt[1],nt[0],nt[1],grace,includeDt,missingTMsg)
                     # TODO: Add progress messages with cv2.CAP_PROP_POS_AVI_RATIO
             lt = nt
     finally:
@@ -163,7 +169,7 @@ def annotateVideo(vidIn, vidOut, tempFile, graceSecs, useK, includeDt):
         vidOut.release()
 
 
-def processFrame(vidIn, vidStartDt, vidOut, fw, fh, prevTempDt, prevTemp, currTempDt, currTemp, grace, includeDt):
+def processFrame(vidIn, vidStartDt, vidOut, fw, fh, prevTempDt, prevTemp, currTempDt, currTemp, grace, includeDt, missingTMsg):
     """Processes the next frame of the video
 
     :param vidIn: VideoCapture object representing the original unannotated video
@@ -177,6 +183,7 @@ def processFrame(vidIn, vidStartDt, vidOut, fw, fh, prevTempDt, prevTemp, currTe
     :param currTemp: the temperature string for the current temperature log
     :param grace: a timedelta object indicating the grace period for a temperature reading
     :param includeDt: a Boolean indicating whether the annotation should include the datetime of the frame or not
+    :param missingTMsg: annotation containing string to use if temp is missing for a frame
     :return: true if the frame is still within the window of the previous and current temperature logs
             false if the frame could not be read or if the frame is later than the current temp log
     """
@@ -184,18 +191,22 @@ def processFrame(vidIn, vidStartDt, vidOut, fw, fh, prevTempDt, prevTemp, currTe
     frameDt = vidStartDt + timedelta(milliseconds=vidIn.get(cv2.CAP_PROP_POS_MSEC))
     # use previous temp if frame is between previous and current temp logs
     if rv and prevTempDt < frameDt and frameDt < currTempDt:
-        cont = True # still between previous and current logs - keep reading frames for same temp log
+        cont = True  # still between previous and current logs - keep reading frames for same temp log
         if frameDt < prevTempDt+grace:
-            annotateFrame(frame, frameDt, prevTemp, fw, fh, includeDt)
+            tStr = prevTemp
         else:
+            tStr = missingTMsg
             warnMissingTemp(prevTempDt,currTempDt,frameDt)
     else:  # once you advance to a frame later than nt (or run out of frames), stop advancing
-        cont = False;
+        cont = False
         # still need to write a temp to the last frame read - check still w/in grace period of current log
         if rv and currTempDt <= frameDt and frameDt <= currTempDt + grace:
-            annotateFrame(frame, frameDt, currTemp, fw, fh, includeDt)
-    # if you got a frame, write to output whether you annotated or not
+            tStr = currTemp
+        else:
+            tStr = missingTMsg
+    # if you got a frame, annotate and write to output
     if rv:
+        annotateFrame(frame, frameDt, tStr, fw, fh, includeDt)
         writeFrame(vidOut,frame) if not testMode else showFrame(frame)
     return cont
 
@@ -269,7 +280,7 @@ def showFrame(frame):
 def main():
     parms = getParms()
     # TODO: figure out a way to stop immediately for a file that is already annotated
-    annotateVideo(parms['vidIn'],parms['vidOut'],parms['tempLog'],parms['grace'],parms['useK'],parms['includeDt'])
+    annotateVideo(parms['vidIn'], parms['vidOut'], parms['tempLog'], parms['grace'], parms['useK'], parms['includeDt'], parms['missingT'])
 
 
 verbose = False
@@ -285,6 +296,7 @@ tfThickness = 3
 dfScale=.5
 dfThickness=2
 testWin = 'annotation test'
+
 
 
 if __name__ == '__main__':

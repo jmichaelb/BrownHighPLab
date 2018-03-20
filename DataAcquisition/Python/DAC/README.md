@@ -43,3 +43,35 @@ Optional parameters are listed below, with the most likely to be used listed fir
 * Matlab script to import logs for an experiment.  Should have option for imported time to be in the local time zone
 * Plot should be 2 sub plot, one with total time record for the file and one with just the last 30 minutes.
 * Make a script that incorporate the temperature in a video from a temperature logfile (add temperature reading to every frame from )
+
+# Using annotateCrystalVideo.py
+
+## Setup
+1. Install XCode from the App Store, then run `xcode-select --install` in Terminal to install tools
+1. [Install](https://superuser.com/questions/624561/install-ffmpeg-on-os-x#624562) [ffmpeg](https://ffmpeg.org/)
+1. Install [Python 2](https://www.python.org/downloads/mac-osx/)
+1. Install the [opencv](https://docs.opencv.org/master/index.html) library using `pip install opencv-python` (this also installs [numpy](http://www.numpy.org/))
+1. Copy annotateCrystalVideo.py to your computer
+
+## Usage
+1. To call script, open Terminal
+1. Start the script with the following command in Terminal - values that must be specified by the user are enclosed in <>.  [Parameters](#parameters) are documented below.
+    `python <relative path>/annotateCrystalVideo.py -i <videoToAnnotate> -l <tempLog> <optional parameters>`
+
+## Parameters
+### Required parameters
+* `-i` full or relative path to the mp4 file to be annotated
+* `-l` full or relative path to the temperature log file that has the temperatures for the video.  __Warning__: the script assumes that the temperature log begins before and ends after the video.  It may not work properly if those conditions are not met.
+
+### Optional parameters
+| parameter | default | description |
+|:---------:|:-------:|:----------- |
+| `-o` <path> | same path as `-i` but with _Annotated appended to file name before its extension | full or relative path to the annotated video file |
+| `-g` <int> | 10 | grace period beyond which temperature is assumed to be the same as the last available temperature, in seconds |
+| `-m` <str> | 'n/a' | string to use for annotation if T is missing (usually because grace period is exceeded between two temperature logs |
+| `-d` | *T only* | add this flag to include date and time in the annotation along with the temperature |
+| `-k` | *°C* | add this flag to get temperature output in Kelvin |
+| `-v` | *off* | verbose mode |
+| `-t` | *off* | test mode - displays video with annotation but does not save it |
+
+

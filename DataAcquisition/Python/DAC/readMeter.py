@@ -54,7 +54,7 @@ def parseRawReading(rawReading, extractPattern, targetGroup=0):
     return float(meterRead.group(targetGroup))
 
 
-def getParsePattern(cmd, pattem='(?<=COMMAND)\d+\.\d+'):
+def getParsePattern(cmd, pattem='(?<=COMMAND)-?\d+\.\d+'):
     """ Turns a regex template into command-specific regex
 
     :param cmd: the read command
@@ -97,6 +97,8 @@ def logReading(logFile, readTime, reading):
     """
     readTimeUTC = datetime.utcfromtimestamp(readTime)
     ll = readTimeUTC.strftime(logTimeFormat)+'\t'+repr(reading)+'\n'
+    if verbose:
+        print ll
     try:
         with open(logFile, 'a') as lf:
             lf.write(ll)
@@ -205,7 +207,7 @@ def takeReading(parms, cmdPattern, logFileName):
 
 def getFakeReading(cmd):
     """FOR TESTING ONLY - Needs to return same output as getRawReading"""
-    fakeReading = '?43^M'+cmd+'00000'+repr(round(uniform(20,25),1))+'^M'
+    fakeReading = '?43^M'+cmd+str(round(uniform(-20,25),1)).zfill(7)+'^M'
     return time(), fakeReading
 
 def plotReadings(readings, line):
